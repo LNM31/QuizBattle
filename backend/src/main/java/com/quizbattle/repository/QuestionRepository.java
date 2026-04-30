@@ -1,5 +1,8 @@
 package com.quizbattle.repository;
 
-public interface QuestionRepository {
-    // completat la T02
+import com.quizbattle.model.Question;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface QuestionRepository extends JpaRepository<Question, Long> {
+
 }

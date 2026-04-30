@@ -1,5 +1,10 @@
 package com.quizbattle.repository;
 
-public interface GameSessionRepository {
-    // completat la T02
+import com.quizbattle.model.GameSession;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.Optional;
+
+public interface GameSessionRepository extends JpaRepository<GameSession, Long> {
+    Optional<GameSession> findGameSessionByGameCode(String gameCode);
 }
