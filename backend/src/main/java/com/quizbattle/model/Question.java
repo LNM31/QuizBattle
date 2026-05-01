@@ -4,8 +4,10 @@ import com.quizbattle.model.enums.QuestionType;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "question")
@@ -28,6 +30,7 @@ public class Question {
     @Column(nullable = false)
     private QuestionType type;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb", nullable = false) // converting the string to jsonb with Object Mapper in ServiceLayer
     private String options;
 

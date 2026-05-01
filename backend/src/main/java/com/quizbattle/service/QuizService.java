@@ -3,6 +3,7 @@ package com.quizbattle.service;
 import com.quizbattle.dto.QuizResponse;
 import com.quizbattle.repository.QuizRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -18,6 +19,7 @@ public class QuizService {
         return quizRepository.findPredefinedCategories();
     }
 
+    @Transactional(readOnly = true)
     public List<QuizResponse> getQuizzesByCategory(String category) {
         return quizRepository.findQuizByCategory(category).stream()
                 .map(quiz -> new QuizResponse(

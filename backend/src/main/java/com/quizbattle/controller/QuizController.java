@@ -1,7 +1,6 @@
 package com.quizbattle.controller;
 
 import com.quizbattle.dto.QuizResponse;
-import com.quizbattle.model.Quiz;
 import com.quizbattle.service.QuizService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
