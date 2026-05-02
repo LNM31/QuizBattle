@@ -9,7 +9,7 @@ import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-@Component
+@Component // for injection in GameService and other classes
 public class GameManager {
                                   // code
     private final ConcurrentHashMap<String, ActiveGame> activeGames = new ConcurrentHashMap<>();
@@ -47,6 +47,4 @@ public class GameManager {
         }
         return sb.toString();
     }
-
-
 }

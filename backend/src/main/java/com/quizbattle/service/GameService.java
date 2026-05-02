@@ -1,8 +1,84 @@
 package com.quizbattle.service;
 
+import com.quizbattle.dto.GameStateResponse;
+import com.quizbattle.game.ActiveGame;
+import com.quizbattle.game.GameManager;
+import com.quizbattle.model.GameSession;
+import com.quizbattle.model.Quiz;
+import com.quizbattle.model.enums.GameMode;
+import com.quizbattle.model.enums.GameStatus;
+import com.quizbattle.repository.GameSessionRepository;
+import com.quizbattle.repository.QuizRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
+
+import javax.accessibility.AccessibleIcon;
+import java.util.Map;
 
 @Service
 public class GameService {
-    // completat la T04-T08
+    private final GameSessionRepository gameSessionRepository;
+    private final QuizRepository quizRepository;
+    private final GameManager gameManager;
+
+    public GameService(
+            GameSessionRepository gameSessionRepository,
+            QuizRepository quizRepository,
+            GameManager gameManager) {
+        this.gameSessionRepository = gameSessionRepository;
+        this.quizRepository = quizRepository;
+        this.gameManager = gameManager;
+    }
+
+    public Map<String, String> createGame(Long quizId, GameMode mode) {
+        Quiz quiz = quizRepository.findById(quizId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Quiz not found"));
+
+        ActiveGame activeGame = gameManager.createGame(quizId, mode);
+
+        GameSession session = new GameSession();
+        session.setGameCode(activeGame.getGameCode());
+        session.setQuiz(quiz);
+        session.setMode(mode);
+        session.setStatus(GameStatus.LOBBY);
+        gameSessionRepository.save(session);
+
+        return Map.of(
+          "gameCode", activeGame.getGameCode(),
+          "hostTaken", activeGame.getHostToken()
+        );
+    }
+
+    public Map<String, String> joinGame(String code, String nickname) {
+        ActiveGame activeGame = gameManager.getGame(code)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Game not found"));
+
+        if (activeGame.hasPlayer(nickname)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Nickname already taken");
+        }
+
+        activeGame.addPlayer(nickname);
+
+        return Map.of(
+                "gameCode", code,
+                "nickname", nickname,
+                "status", activeGame.getMode().toString()
+        );
+    }
+
+    public GameStateResponse getGameState(String code) {
+        ActiveGame activeGame = gameManager.getGame(code)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Game not found"));
+
+        GameSession session = gameSessionRepository.findGameSessionByGameCode(code)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Session not found"));
+
+        return new GameStateResponse(
+                code,
+                session.getStatus(),
+                session.getQuiz().getTitle(),
+                activeGame.getPlayerCount()
+        );
+    }
 }
