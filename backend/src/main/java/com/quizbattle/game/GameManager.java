@@ -1,7 +1,6 @@
 package com.quizbattle.game;
 
 import com.quizbattle.model.enums.GameMode;
-import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
@@ -40,7 +39,7 @@ public class GameManager {
         return code;
     }
 
-    private @NonNull String generateCode() {
+    private String generateCode() {
         StringBuilder sb = new StringBuilder(6);
         for (int i = 0; i < 6; i++) {
             sb.append(CHARS.charAt(random.nextInt(CHARS.length())));

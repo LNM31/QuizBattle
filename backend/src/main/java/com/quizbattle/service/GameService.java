@@ -11,9 +11,9 @@ import com.quizbattle.repository.GameSessionRepository;
 import com.quizbattle.repository.QuizRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import javax.accessibility.AccessibleIcon;
 import java.util.Map;
 
 @Service
@@ -46,7 +46,7 @@ public class GameService {
 
         return Map.of(
           "gameCode", activeGame.getGameCode(),
-          "hostTaken", activeGame.getHostToken()
+          "hostToken", activeGame.getHostToken()
         );
     }
 
@@ -63,10 +63,11 @@ public class GameService {
         return Map.of(
                 "gameCode", code,
                 "nickname", nickname,
-                "status", activeGame.getMode().toString()
+                "mode", activeGame.getMode().toString()
         );
     }
 
+    @Transactional(readOnly = true)
     public GameStateResponse getGameState(String code) {
         ActiveGame activeGame = gameManager.getGame(code)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Game not found"));
