@@ -58,7 +58,7 @@ public class GameService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Nickname already taken");
         }
 
-        activeGame.addPlayer(nickname);
+        activeGame.addPlayer(nickname, null);
 
         return Map.of(
                 "gameCode", code,

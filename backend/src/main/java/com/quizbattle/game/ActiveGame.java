@@ -3,6 +3,7 @@ package com.quizbattle.game;
 import com.quizbattle.model.enums.GameMode;
 import lombok.Data;
 
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Data
@@ -20,8 +21,16 @@ public class ActiveGame {
         this.hostToken = hostToken;
     }
 
-    public void addPlayer(String nickname) {
-        players.put(nickname, new ActivePlayer(nickname, 0, 0, 0, 0, 0L, false, false));
+    public void addPlayer(String nickname, String webSocketSessionId) {
+        players.put(nickname, new ActivePlayer(nickname, webSocketSessionId, 0, 0, 0, 0, 0L, false, false));
+    }
+
+    public void removePlayer(String nickname) {
+        players.remove(nickname);
+    }
+
+    public List<String> getPlayerNames() {
+        return List.copyOf(players.keySet());
     }
 
     public int getPlayerCount() {

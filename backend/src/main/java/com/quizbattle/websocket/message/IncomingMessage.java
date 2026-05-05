@@ -1,5 +1,12 @@
 package com.quizbattle.websocket.message;
 
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
 public class IncomingMessage {
-    // completat la T05
+    private String type;
+    private String answer;
+    private Long timestamp;
 }
