@@ -3,6 +3,7 @@ package com.quizbattle.game;
 import com.quizbattle.model.enums.GameMode;
 import org.springframework.stereotype.Component;
 
+import java.util.Collection;
 import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
@@ -25,6 +26,10 @@ public class GameManager {
 
     public Optional<ActiveGame> getGame(String code) {
         return Optional.ofNullable(activeGames.get(code));
+    }
+
+    public Collection<ActiveGame> getAllGames() {
+        return activeGames.values();
     }
 
     public void removeGame(String code) {

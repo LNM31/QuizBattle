@@ -33,8 +33,21 @@ public class ActiveGame {
         return List.copyOf(players.keySet());
     }
 
+    public List<String> getConnectedPlayerNames() {
+        return players.values().stream()
+                .filter(p -> p.getWebSocketSessionId() != null)
+                .map(ActivePlayer::getNickname)
+                .toList();
+    }
+
     public int getPlayerCount() {
         return players.size();
+    }
+
+    public int getConnectedPlayerCount() {
+        return (int) players.values().stream()
+                .filter(p -> p.getWebSocketSessionId() != null)
+                .count();
     }
 
     public boolean hasPlayer(String nickname) {
