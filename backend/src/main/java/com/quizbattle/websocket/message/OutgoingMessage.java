@@ -1,5 +1,8 @@
 package com.quizbattle.websocket.message;
 
+import com.quizbattle.model.Question;
+import com.quizbattle.model.enums.GameMode;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,6 +22,29 @@ public class OutgoingMessage {
         msg.put("type", "PLAYER_LEFT");
         msg.put("nickname", nickname);
         msg.put("playerCount", playerCount);
+        return msg;
+    }
+
+    public static Map<String, Object> gameStart(int totalQuestions, GameMode gameMode) {
+        Map<String, Object> msg = new HashMap<>();
+        msg.put("type", "GAME_START");
+        msg.put("totalQuestions", totalQuestions);
+        msg.put("gameMode", gameMode);
+        return msg;
+    }
+
+    public static Map<String, Object> question(Question q, Object options,
+                                               int questionNumber, int totalQuestions,
+                                               long timestamp) {
+        Map<String, Object> msg = new HashMap<>();
+        msg.put("type", "QUESTION");
+        msg.put("questionNumber", questionNumber);
+        msg.put("totalQuestions", totalQuestions);
+        msg.put("text", q.getText());
+        msg.put("questionType", q.getType().toString());
+        msg.put("options", options); // parsed JSON
+        msg.put("timeLimit", q.getTimeLimitSeconds());
+        msg.put("timestamp", timestamp);
         return msg;
     }
 }
