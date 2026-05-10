@@ -41,7 +41,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
     @Override
     public void afterConnectionEstablished(@NonNull WebSocketSession session) throws Exception {
         String gameCode = extractGameCode(session);
-        String nickname = extractNickname(session);
+        String nickname = extractParam(session, "nickname");
 
         ActiveGame activeGame = gameManager.getGame(gameCode).orElse(null);
         if (activeGame == null || !activeGame.hasPlayer(nickname)) {
@@ -67,8 +67,12 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             for (ActivePlayer activePlayer : activeGame.getPlayers().values()) {
                 if (session.getId().equals(activePlayer.getWebSocketSessionId())) {
                     String nickname = activePlayer.getNickname();
-                    activeGame.removePlayer(nickname);
-                    broadcast(activeGame, OutgoingMessage.playerLeft(nickname, activeGame.getConnectedPlayerCount()));
+                    if (activeGame.getGamePhase() == GamePhase.LOBBY) {
+                        activeGame.removePlayer(nickname);
+                        broadcast(activeGame, OutgoingMessage.playerLeft(nickname, activeGame.getConnectedPlayerCount()));
+                    } else {
+                        activePlayer.setWebSocketSessionId(null);
+                    }
                     return;
                 }
             }
@@ -78,7 +82,21 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
     @Override
     protected void handleTextMessage(@NonNull WebSocketSession session, TextMessage message) throws Exception {
         IncomingMessage incomingMessage = objectMapper.readValue(message.getPayload(), IncomingMessage.class);
-        // T06 va adauga logica pentru ANSWER, HOST_START, HOST_NEXT
+        String gameCode = extractGameCode(session);
+        String nickname = extractParam(session, "nickname");
+        ActiveGame activeGame = gameManager.getGame(gameCode).orElse(null);
+        if (activeGame == null) return;
+
+        switch (incomingMessage.getType()) {
+            case "HOST_START" -> {
+                // Host: ws://server/ws/game/AB3K9X?nickname=Alex&hostToken=uuid-xxx
+                String hostToken = extractParam(session, "hostToken");
+                if (!activeGame.getHostToken().equals(hostToken)) return;
+                gameService.startGame(gameCode);
+                broadcast(activeGame, OutgoingMessage.gameStart(activeGame.getQuestions().size(), activeGame.getMode().toString()));
+                sendQuestion(activeGame, 0);
+            }
+        }
     }
 
     private void sendQuestion(ActiveGame activeGame, int index) throws IOException {
@@ -121,7 +139,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         return path.substring(path.lastIndexOf('/') + 1);
     }
 
-    private String extractNickname(WebSocketSession session) {
+    private String extractParam(WebSocketSession session, String parameterName) {
         // query: nickname=Alex
         String query = Objects.requireNonNull(session.getUri()).getQuery();
 
@@ -131,7 +149,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
 
         for (String param: query.split("&")) {
             String[] kv = param.split("=", 2);
-            if (kv.length == 2 && kv[0].equals("nickname")) {
+            if (kv.length == 2 && kv[0].equals(parameterName)) {
                 return kv[1];
             }
         }

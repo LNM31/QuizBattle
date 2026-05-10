@@ -1,8 +1,6 @@
 package com.quizbattle.websocket.message;
 
 import com.quizbattle.model.Question;
-import com.quizbattle.model.enums.GameMode;
-
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,7 +23,7 @@ public class OutgoingMessage {
         return msg;
     }
 
-    public static Map<String, Object> gameStart(int totalQuestions, GameMode gameMode) {
+    public static Map<String, Object> gameStart(int totalQuestions, String gameMode) {
         Map<String, Object> msg = new HashMap<>();
         msg.put("type", "GAME_START");
         msg.put("totalQuestions", totalQuestions);

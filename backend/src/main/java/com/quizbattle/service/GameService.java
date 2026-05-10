@@ -10,7 +10,6 @@ import com.quizbattle.model.Quiz;
 import com.quizbattle.model.enums.GameMode;
 import com.quizbattle.model.enums.GameStatus;
 import com.quizbattle.repository.GameSessionRepository;
-import com.quizbattle.repository.QuestionRepository;
 import com.quizbattle.repository.QuizRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -26,16 +25,14 @@ import java.util.Map;
 public class GameService {
     private final GameSessionRepository gameSessionRepository;
     private final QuizRepository quizRepository;
-    private final QuestionRepository questionRepository;
     private final GameManager gameManager;
 
     public GameService(
             GameSessionRepository gameSessionRepository,
-            QuizRepository quizRepository, QuestionRepository questionRepository,
+            QuizRepository quizRepository,
             GameManager gameManager) {
         this.gameSessionRepository = gameSessionRepository;
         this.quizRepository = quizRepository;
-        this.questionRepository = questionRepository;
         this.gameManager = gameManager;
     }
 
@@ -59,13 +56,9 @@ public class GameService {
     }
 
     @Transactional
-    public void startGame(String gameCode, String hostToken) {
+    public void startGame(String gameCode) {
         ActiveGame activeGame = gameManager.getGame(gameCode)
                 .orElseThrow(()  -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Game not found"));
-
-        if (!activeGame.getHostToken().equals(hostToken)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Host Token not matched");
-        }
 
         if (activeGame.getGamePhase() != GamePhase.LOBBY) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Game already started");
