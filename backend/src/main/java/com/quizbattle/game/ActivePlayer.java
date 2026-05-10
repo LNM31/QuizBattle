@@ -16,5 +16,7 @@ public class ActivePlayer {
     private int correctCount;
     private long totalResponseTimeMs;
     private boolean answered;
+    private String lastAnswer;
+    private long lastAnswerTimestamp;
     private boolean eliminated;
 }

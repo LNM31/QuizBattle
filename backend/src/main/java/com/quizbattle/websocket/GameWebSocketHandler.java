@@ -96,6 +96,21 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                 broadcast(activeGame, OutgoingMessage.gameStart(activeGame.getQuestions().size(), activeGame.getMode().toString()));
                 sendQuestion(activeGame, 0);
             }
+            case "ANSWER" -> {
+                if (activeGame.getGamePhase() != GamePhase.QUESTION) return;
+                ActivePlayer player = activeGame.getPlayers().get(nickname);
+                if (player == null || player.isAnswered()) return;
+
+                synchronized (activeGame) {
+                    if (activeGame.getGamePhase() != GamePhase.QUESTION) return; // re-check dupa sync
+                    player.setAnswered(true);
+                    player.setLastAnswer(incomingMessage.getAnswer());
+                    player.setLastAnswerTimestamp(incomingMessage.getTimestamp());
+                    if (activeGame.allAnswered()) {
+                        activeGame.setGamePhase(GamePhase.REVEAL); // later in T7
+                    }
+                }
+            }
         }
     }
 

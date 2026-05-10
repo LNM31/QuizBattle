@@ -28,7 +28,7 @@ public class ActiveGame {
     }
 
     public void addPlayer(String nickname, String webSocketSessionId) {
-        players.put(nickname, new ActivePlayer(nickname, webSocketSessionId, 0, 0, 0, 0, 0L, false, false));
+        players.put(nickname, new ActivePlayer(nickname, webSocketSessionId, 0, 0, 0, 0, 0L, false, null, 0L, false));
     }
 
     public void removePlayer(String nickname) {
