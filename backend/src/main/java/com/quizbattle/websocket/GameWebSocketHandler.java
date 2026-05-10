@@ -3,6 +3,9 @@ package com.quizbattle.websocket;
 import com.quizbattle.game.ActiveGame;
 import com.quizbattle.game.ActivePlayer;
 import com.quizbattle.game.GameManager;
+import com.quizbattle.game.GamePhase;
+import com.quizbattle.model.Question;
+import com.quizbattle.service.GameService;
 import com.quizbattle.websocket.message.IncomingMessage;
 import com.quizbattle.websocket.message.OutgoingMessage;
 import lombok.NonNull;
@@ -17,16 +20,22 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 @Component
 public class GameWebSocketHandler extends TextWebSocketHandler {
     private final GameManager gameManager;
     private final ObjectMapper objectMapper;
+    private final GameService gameService;
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(4);
     private final ConcurrentHashMap<String, WebSocketSession> sessions = new ConcurrentHashMap<>();
 
-    public GameWebSocketHandler(GameManager gameManager, ObjectMapper objectMapper) {
+    public GameWebSocketHandler(GameManager gameManager, ObjectMapper objectMapper, GameService gameService) {
         this.gameManager = gameManager;
         this.objectMapper = objectMapper;
+        this.gameService = gameService;
     }
 
     @Override
@@ -70,6 +79,29 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
     protected void handleTextMessage(@NonNull WebSocketSession session, TextMessage message) throws Exception {
         IncomingMessage incomingMessage = objectMapper.readValue(message.getPayload(), IncomingMessage.class);
         // T06 va adauga logica pentru ANSWER, HOST_START, HOST_NEXT
+    }
+
+    private void sendQuestion(ActiveGame activeGame, int index) throws IOException {
+        Question q = activeGame.getQuestions().get(index);
+        Object parsedOptions = objectMapper.readValue(q.getOptions(), Object.class);
+        long ts = System.currentTimeMillis();
+        activeGame.setQuestionStartTimestamp(ts);
+        activeGame.resetAnswers();
+        broadcast(activeGame, OutgoingMessage.question(q, parsedOptions, index + 1, activeGame.getQuestions().size(), ts));
+        scheduleQuestionTimeout(activeGame.getGameCode(), index, q.getTimeLimitSeconds());
+    }
+
+    private void scheduleQuestionTimeout(String gameCode, int questionIndex, int timeLimitSeconds) {
+        scheduler.schedule(() -> {
+            ActiveGame activeGame = gameManager.getGame(gameCode).orElse(null);
+            if (activeGame == null) return;
+            synchronized (activeGame) {
+                // ignoram daca jocul a avansat deja (toti au raspuns inainte de timer)
+                if (activeGame.getGamePhase() != GamePhase.QUESTION) return;
+                if (activeGame.getCurrentQuestionIndex() != questionIndex) return;
+                activeGame.setGamePhase(GamePhase.REVEAL); // T07 va adauga broadcast REVEAL + LEADERBOARD aici
+            }
+        }, timeLimitSeconds, TimeUnit.SECONDS);
     }
 
     private void broadcast(ActiveGame activeGame, Map<String, Object> payload) throws IOException {
