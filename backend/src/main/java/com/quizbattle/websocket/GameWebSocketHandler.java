@@ -125,23 +125,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             case "HOST_NEXT" -> {
                 String hostToken = extractParam(session, "hostToken");
                 if (!Objects.equals(activeGame.getHostToken(), hostToken)) return;
-                int nextIndex = -1;
-                boolean isLast = false;
-                synchronized (activeGame) {
-                    if (activeGame.getGamePhase() != GamePhase.LEADERBOARD) return;
-                    nextIndex = activeGame.getCurrentQuestionIndex() + 1;
-                    isLast = nextIndex >= activeGame.getQuestions().size();
-                    if (isLast) {
-                        activeGame.setGamePhase(GamePhase.FINISHED);
-                    } else {
-                        activeGame.setCurrentQuestionIndex(nextIndex);
-                        activeGame.setGamePhase(GamePhase.QUESTION);
-                    }
-                }
-                if (!isLast) {
-                    sendQuestion(activeGame, nextIndex);
-                }
-                // T08 handles FINISHED
+                tryAdvanceFromLeaderboard(gameCode);
             }
         }
     }
@@ -161,12 +145,145 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             ActiveGame activeGame = gameManager.getGame(gameCode).orElse(null);
             if (activeGame == null) return;
             synchronized (activeGame) {
-                // ignoram daca jocul a avansat deja (toti au raspuns inainte de timer)
                 if (activeGame.getGamePhase() != GamePhase.QUESTION) return;
                 if (activeGame.getCurrentQuestionIndex() != questionIndex) return;
-                activeGame.setGamePhase(GamePhase.REVEAL); // T07 va adauga broadcast REVEAL + LEADERBOARD aici
+                activeGame.setGamePhase(GamePhase.REVEAL);
+            }
+            try {
+                startRevealPhase(activeGame);
+            } catch (IOException e) {
+                // session closed mid-broadcast
             }
         }, timeLimitSeconds, TimeUnit.SECONDS);
+    }
+
+    private void startRevealPhase(ActiveGame activeGame) throws IOException {
+        Question currentQuestion = activeGame.getQuestions().get(activeGame.getCurrentQuestionIndex());
+        calculateAndApplyScores(activeGame, currentQuestion);
+        broadcast(activeGame, buildRevealMessage(activeGame, currentQuestion));
+
+        String gameCode = activeGame.getGameCode();
+        scheduler.schedule(() -> {
+            ActiveGame ag = gameManager.getGame(gameCode).orElse(null);
+            if (ag == null) return;
+            synchronized (ag) {
+                if (ag.getGamePhase() != GamePhase.REVEAL) return;
+                ag.setGamePhase(GamePhase.LEADERBOARD);
+            }
+            try {
+                broadcastLeaderboard(ag);
+                scheduleNextQuestion(ag);
+            } catch (IOException e) {
+                // session closed mid-broadcast
+            }
+        }, 4, TimeUnit.SECONDS);
+    }
+
+    private void calculateAndApplyScores(ActiveGame activeGame, Question question) {
+        for (ActivePlayer player : activeGame.getPlayers().values()) {
+            if (!player.isAnswered() || player.getLastAnswer() == null) {
+                player.setCurrentStreak(0);
+                player.setLastPointsGained(0);
+                continue;
+            }
+            boolean correct = question.getCorrectAnswer().equals(player.getLastAnswer());
+            if (correct) {
+                int newStreak = player.getCurrentStreak() + 1;
+                player.setCurrentStreak(newStreak);
+                player.setBestStreak(Math.max(player.getBestStreak(), newStreak));
+                player.setCorrectCount(player.getCorrectCount() + 1);
+                long responseMs = player.getLastAnswerTimestamp() - activeGame.getQuestionStartTimestamp();
+                player.setTotalResponseTimeMs(player.getTotalResponseTimeMs() + responseMs);
+                int points = ScoreCalculator.calculate(responseMs, question.getTimeLimitSeconds(), newStreak);
+                player.setScore(player.getScore() + points);
+                player.setLastPointsGained(points);
+            } else {
+                player.setCurrentStreak(0);
+                player.setLastPointsGained(0);
+            }
+        }
+    }
+
+    private Map<String, Object> buildRevealMessage(ActiveGame activeGame, Question question) {
+        Map<String, Long> distribution = activeGame.getPlayers().values().stream()
+                .filter(p -> p.isAnswered() && p.getLastAnswer() != null)
+                .collect(Collectors.groupingBy(ActivePlayer::getLastAnswer, Collectors.counting()));
+
+        long correctCount = activeGame.getPlayers().values().stream()
+                .filter(p -> p.isAnswered() && question.getCorrectAnswer().equals(p.getLastAnswer()))
+                .count();
+
+        return OutgoingMessage.reveal(
+                question.getCorrectAnswer(),
+                (int) correctCount,
+                activeGame.getPlayers().size(),
+                distribution
+        );
+    }
+
+    private void broadcastLeaderboard(ActiveGame activeGame) throws IOException {
+        List<ActivePlayer> sorted = activeGame.getPlayers().values().stream()
+                .sorted(Comparator.comparingInt(ActivePlayer::getScore).reversed())
+                .toList();
+
+        Map<String, Integer> previousRankings = activeGame.getPreviousRankings();
+        List<Map<String, Object>> entries = new ArrayList<>();
+
+        for (int i = 0; i < sorted.size(); i++) {
+            ActivePlayer p = sorted.get(i);
+            int currentPosition = i + 1;
+            int previousPosition = previousRankings.getOrDefault(p.getNickname(), currentPosition);
+            int change = previousPosition - currentPosition; // pozitiv = urcat
+
+            Map<String, Object> entry = new HashMap<>();
+            entry.put("nickname", p.getNickname());
+            entry.put("score", p.getScore());
+            entry.put("change", change);
+            entry.put("pointsGained", p.getLastPointsGained());
+            entry.put("streak", p.getCurrentStreak());
+            entries.add(entry);
+        }
+
+        Map<String, Integer> newRankings = new HashMap<>();
+        for (int i = 0; i < sorted.size(); i++) {
+            newRankings.put(sorted.get(i).getNickname(), i + 1);
+        }
+        activeGame.setPreviousRankings(newRankings);
+
+        broadcast(activeGame, OutgoingMessage.leaderboard(entries));
+    }
+
+    private void scheduleNextQuestion(ActiveGame activeGame) {
+        String gameCode = activeGame.getGameCode();
+        scheduler.schedule(() -> {
+            try {
+                tryAdvanceFromLeaderboard(gameCode);
+            } catch (IOException e) {
+                // session closed mid-broadcast
+            }
+        }, 4, TimeUnit.SECONDS);
+    }
+
+    private void tryAdvanceFromLeaderboard(String gameCode) throws IOException {
+        ActiveGame activeGame = gameManager.getGame(gameCode).orElse(null);
+        if (activeGame == null) return;
+        int nextIndex;
+        boolean isLast;
+        synchronized (activeGame) {
+            if (activeGame.getGamePhase() != GamePhase.LEADERBOARD) return;
+            nextIndex = activeGame.getCurrentQuestionIndex() + 1;
+            isLast = nextIndex >= activeGame.getQuestions().size();
+            if (isLast) {
+                activeGame.setGamePhase(GamePhase.FINISHED);
+            } else {
+                activeGame.setCurrentQuestionIndex(nextIndex);
+                activeGame.setGamePhase(GamePhase.QUESTION);
+            }
+        }
+        if (!isLast) {
+            sendQuestion(activeGame, nextIndex);
+        }
+        // T08 handles FINISHED
     }
 
     private void broadcast(ActiveGame activeGame, Map<String, Object> payload) throws IOException {
