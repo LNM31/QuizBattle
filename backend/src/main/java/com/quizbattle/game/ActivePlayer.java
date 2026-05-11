@@ -19,4 +19,5 @@ public class ActivePlayer {
     private String lastAnswer;
     private long lastAnswerTimestamp;
     private boolean eliminated;
+    private int lastPointsGained;
 }

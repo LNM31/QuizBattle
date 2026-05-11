@@ -103,6 +103,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
 
                 synchronized (activeGame) {
                     if (activeGame.getGamePhase() != GamePhase.QUESTION) return; // re-check dupa sync
+//                    if (player.isAnswered()) return;
                     player.setAnswered(true);
                     player.setLastAnswer(incomingMessage.getAnswer());
                     player.setLastAnswerTimestamp(incomingMessage.getTimestamp());

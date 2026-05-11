@@ -5,7 +5,9 @@ import com.quizbattle.model.enums.GameMode;
 import lombok.Data;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Data
@@ -19,6 +21,7 @@ public class ActiveGame {
     private int currentQuestionIndex = 0;
     private long questionStartTimestamp = 0L;
     private ConcurrentHashMap<String, ActivePlayer> players = new ConcurrentHashMap<>();
+    private Map<String, Integer> previousRankings = new HashMap<>();
 
     public ActiveGame(String gameCode, Long quizId, GameMode mode, String hostToken) {
         this.gameCode = gameCode;
@@ -28,7 +31,7 @@ public class ActiveGame {
     }
 
     public void addPlayer(String nickname, String webSocketSessionId) {
-        players.put(nickname, new ActivePlayer(nickname, webSocketSessionId, 0, 0, 0, 0, 0L, false, null, 0L, false));
+        players.put(nickname, new ActivePlayer(nickname, webSocketSessionId, 0, 0, 0, 0, 0L, false, null, 0L, false, 0));
     }
 
     public void removePlayer(String nickname) {
