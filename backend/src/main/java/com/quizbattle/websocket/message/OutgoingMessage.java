@@ -63,4 +63,12 @@ public class OutgoingMessage {
         msg.put("leaderboard", entries);
         return msg;
     }
+
+    public static Map<String, Object> gameOver(List<Map<String, Object>> podium, List<Map<String, Object>> fullResults) {
+        Map<String, Object> msg = new HashMap<>();
+        msg.put("type", "GAME_OVER");
+        msg.put("podium", podium);
+        msg.put("fullResults", fullResults);
+        return msg;
+    }
 }

@@ -2,13 +2,16 @@ package com.quizbattle.service;
 
 import com.quizbattle.dto.GameStateResponse;
 import com.quizbattle.game.ActiveGame;
+import com.quizbattle.game.ActivePlayer;
 import com.quizbattle.game.GameManager;
 import com.quizbattle.game.GamePhase;
+import com.quizbattle.model.GameResult;
 import com.quizbattle.model.GameSession;
 import com.quizbattle.model.Question;
 import com.quizbattle.model.Quiz;
 import com.quizbattle.model.enums.GameMode;
 import com.quizbattle.model.enums.GameStatus;
+import com.quizbattle.repository.GameResultRepository;
 import com.quizbattle.repository.GameSessionRepository;
 import com.quizbattle.repository.QuizRepository;
 import org.springframework.http.HttpStatus;
@@ -18,6 +21,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -26,14 +30,17 @@ public class GameService {
     private final GameSessionRepository gameSessionRepository;
     private final QuizRepository quizRepository;
     private final GameManager gameManager;
+    private final GameResultRepository gameResultRepository;
 
     public GameService(
             GameSessionRepository gameSessionRepository,
             QuizRepository quizRepository,
-            GameManager gameManager) {
+            GameManager gameManager,
+            GameResultRepository gameResultRepository) {
         this.gameSessionRepository = gameSessionRepository;
         this.quizRepository = quizRepository;
         this.gameManager = gameManager;
+        this.gameResultRepository = gameResultRepository;
     }
 
     public Map<String, String> createGame(Long quizId, GameMode mode) {
@@ -115,5 +122,46 @@ public class GameService {
         );
     }
 
+    @Transactional
+    public void endGame(String gameCode) {
+        ActiveGame activeGame = gameManager.getGame(gameCode)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Game not found"));
 
+        GameSession gameSession = gameSessionRepository.findGameSessionByGameCode(gameCode)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Session not found"));
+
+        List<ActivePlayer> sorted = activeGame.getPlayers().values().stream()
+                .sorted(Comparator.comparingInt(ActivePlayer::getScore).reversed())
+                .toList();
+
+        int totalQuestions = activeGame.getQuestions().size();
+
+        List<GameResult> results = new ArrayList<>();
+        for (int i = 0; i < sorted.size(); i++) {
+            ActivePlayer p = sorted.get(i);
+            double avgMs = p.getCorrectCount() > 0
+                    ? (double) p.getTotalResponseTimeMs() / p.getCorrectCount()
+                    : 0.0;
+
+            GameResult result = new GameResult();
+            result.setGameSession(gameSession);
+            result.setPlayerNickname(p.getNickname());
+            result.setFinalScore(p.getScore());
+            result.setCorrectCount(p.getCorrectCount());
+            result.setTotalQuestions(totalQuestions);
+            result.setBestStreak(p.getBestStreak());
+            result.setAvgResponseMs(avgMs);
+            result.setFinalPosition(i + 1);
+            results.add(result);
+        }
+
+        gameResultRepository.saveAll(results);
+
+        gameSession.setStatus(GameStatus.FINISHED);
+        gameSession.setFinishedAt(LocalDateTime.now());
+        gameSession.setPlayerCount(activeGame.getPlayers().size());
+        gameSessionRepository.save(gameSession);
+
+        gameManager.removeGame(gameCode);
+    }
 }
