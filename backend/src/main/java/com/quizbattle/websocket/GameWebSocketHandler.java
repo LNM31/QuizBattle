@@ -282,8 +282,36 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         }
         if (!isLast) {
             sendQuestion(activeGame, nextIndex);
+        } else {
+            broadcastGameOver(activeGame);
+            gameService.endGame(gameCode);
         }
-        // T08 handles FINISHED
+    }
+
+    private void broadcastGameOver(ActiveGame activeGame) throws IOException {
+        List<ActivePlayer> sorted = activeGame.getPlayers().values().stream()
+                .sorted(Comparator.comparingInt(ActivePlayer::getScore).reversed())
+                .toList();
+
+        List<Map<String, Object>> fullResults = new ArrayList<>();
+        for (int i = 0; i < sorted.size(); i++) {
+            ActivePlayer p = sorted.get(i);
+            double avgMs = p.getCorrectCount() > 0
+                    ? (double) p.getTotalResponseTimeMs() / p.getCorrectCount()
+                    : 0.0;
+
+            Map<String, Object> entry = new HashMap<>();
+            entry.put("position", i + 1);
+            entry.put("nickname", p.getNickname());
+            entry.put("score", p.getScore());
+            entry.put("correctCount", p.getCorrectCount());
+            entry.put("bestStreak", p.getBestStreak());
+            entry.put("avgResponseMs", avgMs);
+            fullResults.add(entry);
+        }
+
+        List<Map<String, Object>> podium = fullResults.subList(0, Math.min(3, fullResults.size()));
+        broadcast(activeGame, OutgoingMessage.gameOver(podium, fullResults));
     }
 
     private void broadcast(ActiveGame activeGame, Map<String, Object> payload) throws IOException {
