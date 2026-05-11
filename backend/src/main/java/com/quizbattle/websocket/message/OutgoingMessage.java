@@ -45,4 +45,22 @@ public class OutgoingMessage {
         msg.put("timestamp", timestamp);
         return msg;
     }
+
+    public static Map<String, Object> reveal(String correctAnswer, int correctCount,
+                                             int totalPlayers, Map<String, Long> distribution) {
+        Map<String, Object> msg = new HashMap<>();
+        msg.put("type", "REVEAL");
+        msg.put("correctAnswer", correctAnswer);
+        msg.put("correctCount", correctCount);
+        msg.put("totalPlayers", totalPlayers);
+        msg.put("distribution", distribution);
+        return msg;
+    }
+
+    public static Map<String, Object> leaderboard(List<Map<String, Object>> entries) {
+        Map<String, Object> msg = new HashMap<>();
+        msg.put("type", "LEADERBOARD");
+        msg.put("leaderboard", entries);
+        return msg;
+    }
 }

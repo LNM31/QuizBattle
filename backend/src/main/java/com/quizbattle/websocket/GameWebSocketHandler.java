@@ -4,6 +4,7 @@ import com.quizbattle.game.ActiveGame;
 import com.quizbattle.game.ActivePlayer;
 import com.quizbattle.game.GameManager;
 import com.quizbattle.game.GamePhase;
+import com.quizbattle.game.ScoreCalculator;
 import com.quizbattle.model.Question;
 import com.quizbattle.service.GameService;
 import com.quizbattle.websocket.message.IncomingMessage;
@@ -17,12 +18,17 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @Component
 public class GameWebSocketHandler extends TextWebSocketHandler {
@@ -101,16 +107,41 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                 ActivePlayer player = activeGame.getPlayers().get(nickname);
                 if (player == null || player.isAnswered()) return;
 
+                boolean shouldReveal = false;
                 synchronized (activeGame) {
-                    if (activeGame.getGamePhase() != GamePhase.QUESTION) return; // re-check dupa sync
-//                    if (player.isAnswered()) return;
+                    if (activeGame.getGamePhase() != GamePhase.QUESTION) return;
                     player.setAnswered(true);
                     player.setLastAnswer(incomingMessage.getAnswer());
                     player.setLastAnswerTimestamp(incomingMessage.getTimestamp());
                     if (activeGame.allAnswered()) {
-                        activeGame.setGamePhase(GamePhase.REVEAL); // later in T7
+                        activeGame.setGamePhase(GamePhase.REVEAL);
+                        shouldReveal = true;
                     }
                 }
+                if (shouldReveal) {
+                    startRevealPhase(activeGame);
+                }
+            }
+            case "HOST_NEXT" -> {
+                String hostToken = extractParam(session, "hostToken");
+                if (!Objects.equals(activeGame.getHostToken(), hostToken)) return;
+                int nextIndex = -1;
+                boolean isLast = false;
+                synchronized (activeGame) {
+                    if (activeGame.getGamePhase() != GamePhase.LEADERBOARD) return;
+                    nextIndex = activeGame.getCurrentQuestionIndex() + 1;
+                    isLast = nextIndex >= activeGame.getQuestions().size();
+                    if (isLast) {
+                        activeGame.setGamePhase(GamePhase.FINISHED);
+                    } else {
+                        activeGame.setCurrentQuestionIndex(nextIndex);
+                        activeGame.setGamePhase(GamePhase.QUESTION);
+                    }
+                }
+                if (!isLast) {
+                    sendQuestion(activeGame, nextIndex);
+                }
+                // T08 handles FINISHED
             }
         }
     }
