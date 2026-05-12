@@ -4,6 +4,18 @@ export interface JoinGameResponse {
   mode: string
 }
 
+export interface QuizSummary {
+  id: number
+  title: string
+  category: string
+  questionCount: number
+}
+
+export interface CreateGameResponse {
+  gameCode: string
+  hostToken: string
+}
+
 export type GameStatus = 'LOBBY' | 'PLAYING' | 'FINISHED'
 export type GameMode = 'CLASSIC' | 'SURVIVAL' | 'SOLO' | 'TEAM_BATTLE'
 export type QuestionType = 'MCQ' | 'TRUE_FALSE' | 'ORDERING' | 'ESTIMATION' | 'FILL_BLANK'
