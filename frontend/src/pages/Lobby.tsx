@@ -25,7 +25,7 @@ export default function Lobby() {
   const [quizTitle, setQuizTitle] = useState('')
   const [copied, setCopied] = useState(false)
 
-  const { connected, players, gamePhase, sendMessage } = useGameWebSocket(
+  const { connected, players, lastMessage, sendMessage } = useGameWebSocket(
     gameCode || null,
     nickname,
     hostToken,
@@ -49,16 +49,16 @@ export default function Lobby() {
       .catch(() => {})
   }, [gameCode])
 
-  // Navigate to play when game starts.
-  // Watches gamePhase (not lastMessage.type) because React 18 automatic batching
-  // merges the near-simultaneous GAME_START + QUESTION messages into one render,
-  // meaning lastMessage ends up as QUESTION and GAME_START is never seen by the effect.
-  // Both messages set gamePhase to 'QUESTION', so the phase change is always visible.
+  // Navigate to play when the first QUESTION arrives.
+  // We watch lastMessage (not gamePhase) so we can pass the QUESTION payload directly —
+  // Play.tsx uses it as initialQuestion to display immediately without waiting for a
+  // new WS connection. Works whether React 18 batches GAME_START+QUESTION or not:
+  // either way lastMessage ends up as QUESTION when it triggers.
   useEffect(() => {
-    if (gamePhase !== 'LOBBY') {
-      navigate('/play', { state: { gameCode, nickname, hostToken } })
+    if (lastMessage?.type === 'QUESTION') {
+      navigate('/play', { state: { gameCode, nickname, hostToken, initialQuestion: lastMessage } })
     }
-  }, [gamePhase, navigate, gameCode, nickname, hostToken])
+  }, [lastMessage, navigate, gameCode, nickname, hostToken])
 
   const handleCopy = () => {
     navigator.clipboard.writeText(gameCode).then(() => {
