@@ -65,20 +65,32 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
     }
 
     @Override
-    public void afterConnectionClosed(WebSocketSession session,@NonNull CloseStatus status) throws Exception {
+    public void afterConnectionClosed(WebSocketSession session, @NonNull CloseStatus status) throws Exception {
         sessions.remove(session.getId());
+        String closingSessionId = session.getId();
 
-        // gasim in ce joc era acest session
         for (ActiveGame activeGame : gameManager.getAllGames()) {
             for (ActivePlayer activePlayer : activeGame.getPlayers().values()) {
-                if (session.getId().equals(activePlayer.getWebSocketSessionId())) {
+                if (closingSessionId.equals(activePlayer.getWebSocketSessionId())) {
                     String nickname = activePlayer.getNickname();
-                    if (activeGame.getGamePhase() == GamePhase.LOBBY) {
-                        activeGame.removePlayer(nickname);
-                        broadcast(activeGame, OutgoingMessage.playerLeft(nickname, activeGame.getConnectedPlayerCount()));
-                    } else {
-                        activePlayer.setWebSocketSessionId(null);
-                    }
+
+                    // Nu stergem sessionId imediat, lasam timer-ul sa verifice dupa 500ms.
+                    // Daca sesiunea a doua s-a reconectat intre timp, sessionId != closingSessionId → skip.
+                    scheduler.schedule(() -> {
+                        ActivePlayer player = activeGame.getPlayers().get(nickname);
+                        if (player == null) return;
+                        if (!closingSessionId.equals(player.getWebSocketSessionId())) return;
+
+                        player.setWebSocketSessionId(null);
+
+                        if (activeGame.getGamePhase() == GamePhase.LOBBY) {
+                            activeGame.removePlayer(nickname);
+                            try {
+                                broadcast(activeGame, OutgoingMessage.playerLeft(nickname, activeGame.getConnectedPlayerCount()));
+                            } catch (IOException ignored) {}
+                        }
+                    }, 500, TimeUnit.MILLISECONDS);
+
                     return;
                 }
             }
@@ -320,7 +332,9 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             if (player.getWebSocketSessionId() == null) continue;
             WebSocketSession s = sessions.get(player.getWebSocketSessionId());
             if (s != null && s.isOpen()) {
-                s.sendMessage(new TextMessage(json));
+                try {
+                    s.sendMessage(new TextMessage(json));
+                } catch (Exception ignored) {}
             }
         }
     }

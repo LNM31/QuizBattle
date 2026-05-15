@@ -28,6 +28,7 @@ export default function Join() {
       if (err instanceof ApiError) {
         if (err.status === 404) setError('Game not found. Double-check the code and try again.')
         else if (err.status === 409) setError('Nickname already taken. Choose a different one.')
+        else if (err.status === 403) setError('This game has already started.')
         else setError('Something went wrong. Please try again.')
       } else {
         setError('Something went wrong. Please try again.')

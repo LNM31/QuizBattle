@@ -76,6 +76,7 @@ export default function Create() {
         mode,
       })
       localStorage.setItem(`hostToken_${gameCode}`, hostToken)
+      localStorage.setItem(`hostNickname_${gameCode}`, nickname.trim())
       await api.post(`/game/${gameCode}/join`, { nickname: nickname.trim() })
       sessionStorage.setItem('nickname', nickname.trim())
       navigate('/lobby', { state: { gameCode } })

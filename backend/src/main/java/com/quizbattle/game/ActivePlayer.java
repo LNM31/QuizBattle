@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class ActivePlayer {
     private String nickname;
-    private String webSocketSessionId;
+    private volatile String webSocketSessionId;
     private int score;
     private int currentStreak;
     private int bestStreak;

@@ -97,6 +97,10 @@ public class GameService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Nickname already taken");
         }
 
+        if (activeGame.getGamePhase() != GamePhase.LOBBY) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Game already started");
+        }
+
         activeGame.addPlayer(nickname, null);
 
         return Map.of(
