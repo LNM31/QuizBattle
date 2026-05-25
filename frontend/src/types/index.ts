@@ -16,6 +16,12 @@ export interface CreateGameResponse {
   hostToken: string
 }
 
+export interface GenerateQuizResponse {
+  quizId: number
+  title: string
+  questionCount: number
+}
+
 export type GameStatus = 'LOBBY' | 'PLAYING' | 'FINISHED'
 export type GameMode = 'CLASSIC' | 'SURVIVAL' | 'SOLO' | 'TEAM_BATTLE'
 export type QuestionType = 'MCQ' | 'TRUE_FALSE' | 'ORDERING' | 'ESTIMATION' | 'FILL_BLANK'

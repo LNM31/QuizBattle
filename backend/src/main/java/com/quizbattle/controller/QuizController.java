@@ -30,6 +30,11 @@ public class QuizController {
         return quizService.getCategories();
     }
 
+    @GetMapping("/ai-domains")
+    public List<String> getAiDomains() {
+        return geminiService.getPredefinedDomains();
+    }
+
     @GetMapping
     public List<QuizResponse> getQuizzesByCategory(@RequestParam String category) {
         return quizService.getQuizzesByCategory(category);

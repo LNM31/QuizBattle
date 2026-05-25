@@ -9,14 +9,15 @@ import { Card } from '../components/ui/Card'
 import { Input } from '../components/ui/Input'
 import { Button } from '../components/ui/Button'
 import { api, ApiError } from '../lib/api'
-import type { QuizSummary, CreateGameResponse } from '../types'
+import type { QuizSummary, CreateGameResponse, GenerateQuizResponse } from '../types'
 
 type Source = 'PREDEFINED' | 'AI_GENERATED' | 'MANUAL' | 'PDF_UPLOAD'
 type Mode = 'CLASSIC' | 'SURVIVAL' | 'SOLO' | 'TEAM_BATTLE'
+type AiMode = 'domain' | 'custom' | 'random'
 
 const SOURCES: { id: Source; label: string; sub: string; icon: ComponentType<{ size?: number }>; enabled: boolean }[] = [
   { id: 'PREDEFINED',   label: 'Predefined',    sub: 'Curated sets',   icon: BookOpen,    enabled: true },
-  { id: 'AI_GENERATED', label: 'AI Generated',  sub: 'Via Gemini',     icon: Sparkles,    enabled: false },
+  { id: 'AI_GENERATED', label: 'AI Generated',  sub: 'Via Gemini',     icon: Sparkles,    enabled: true },
   { id: 'MANUAL',       label: 'Manual',         sub: 'Write your own', icon: PencilLine,  enabled: false },
   { id: 'PDF_UPLOAD',   label: 'PDF Upload',     sub: 'From files',     icon: FileUp,      enabled: false },
 ]
@@ -26,6 +27,12 @@ const MODES: { id: Mode; label: string; sub: string; icon: ComponentType<{ size?
   { id: 'SURVIVAL',    label: 'Survival',     sub: 'Wrong = out',     icon: Skull,  enabled: false },
   { id: 'SOLO',        label: 'Solo',         sub: 'Play alone',      icon: User,   enabled: false },
   { id: 'TEAM_BATTLE', label: 'Team Battle',  sub: 'Team vs team',    icon: Users,  enabled: false },
+]
+
+const AI_MODES: { id: AiMode; label: string }[] = [
+  { id: 'domain', label: 'Pick Domain' },
+  { id: 'custom', label: 'Custom Topic' },
+  { id: 'random', label: 'Surprise Me' },
 ]
 
 const selectCls =
@@ -39,10 +46,19 @@ export default function Create() {
   const [nickname, setNickname] = useState('')
   const [source, setSource] = useState<Source>('PREDEFINED')
   const [mode, setMode] = useState<Mode>('CLASSIC')
+
+  // Predefined source state
   const [categories, setCategories] = useState<string[]>([])
   const [selectedCategory, setSelectedCategory] = useState('')
   const [quizzes, setQuizzes] = useState<QuizSummary[]>([])
   const [selectedQuizId, setSelectedQuizId] = useState<number | null>(null)
+
+  // AI source state
+  const [aiMode, setAiMode] = useState<AiMode>('domain')
+  const [aiDomains, setAiDomains] = useState<string[]>([])
+  const [aiDomain, setAiDomain] = useState('')
+  const [customTopic, setCustomTopic] = useState('')
+
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -63,16 +79,51 @@ export default function Create() {
       .catch(() => setError('Failed to load quizzes.'))
   }, [selectedCategory])
 
+  useEffect(() => {
+    if (source !== 'AI_GENERATED' || aiDomains.length > 0) return
+    api.get<string[]>('/quiz/ai-domains')
+      .then(data => {
+        setAiDomains(data)
+        setAiDomain(data[0] ?? '')
+      })
+      .catch(() => setError('Failed to load AI domains.'))
+  }, [source, aiDomains.length])
+
+  const isAiReady =
+    aiMode === 'random' ||
+    (aiMode === 'domain' && !!aiDomain) ||
+    (aiMode === 'custom' && !!customTopic.trim())
+
+  const isFormReady =
+    !!nickname.trim() &&
+    (source === 'AI_GENERATED' ? isAiReady : !!selectedQuizId)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!nickname.trim()) { setError('Enter a nickname.'); return }
-    if (!selectedQuizId) { setError('Select a quiz.'); return }
     setError('')
     setLoading(true)
     try {
+      let quizId = selectedQuizId
+
+      if (source === 'AI_GENERATED') {
+        const topic =
+          aiMode === 'random' ? null
+          : aiMode === 'custom' ? customTopic.trim()
+          : aiDomain
+
+        const result = await api.post<GenerateQuizResponse>('/quiz/generate', {
+          topic,
+          difficulty: 'MEDIUM',
+          count: 10,
+        })
+        quizId = result.quizId
+      }
+
+      if (!quizId) { setError('Select a quiz.'); return }
+
       const { gameCode, hostToken } = await api.post<CreateGameResponse>('/game', {
-        quizId: selectedQuizId,
+        quizId,
         mode,
       })
       localStorage.setItem(`hostToken_${gameCode}`, hostToken)
@@ -82,7 +133,11 @@ export default function Create() {
       navigate('/lobby', { state: { gameCode } })
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(`Error ${err.status}: Something went wrong. Please try again.`)
+        if (err.status === 503) {
+          setError('Failed to generate questions. Please try again.')
+        } else {
+          setError(`Error ${err.status}: Something went wrong. Please try again.`)
+        }
       } else {
         setError('Something went wrong. Please try again.')
       }
@@ -210,6 +265,63 @@ export default function Create() {
             </Card>
           )}
 
+          {/* AI Topic (AI Generated flow) */}
+          {source === 'AI_GENERATED' && (
+            <Card>
+              <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">
+                AI Topic
+              </p>
+
+              {/* Mode toggle */}
+              <div className="flex gap-2 mb-4">
+                {AI_MODES.map(m => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setAiMode(m.id)}
+                    className={[
+                      'flex-1 py-2 rounded-lg text-xs font-medium border transition-all',
+                      aiMode === m.id
+                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400'
+                        : 'border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-indigo-300 dark:hover:border-indigo-700',
+                    ].join(' ')}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+
+              {aiMode === 'domain' && (
+                <select
+                  value={aiDomain}
+                  onChange={e => setAiDomain(e.target.value)}
+                  className={selectCls}
+                >
+                  <option value="">Select a domain…</option>
+                  {aiDomains.map(d => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              )}
+
+              {aiMode === 'custom' && (
+                <Input
+                  placeholder="e.g. VLAN networking, Medieval history, Black holes…"
+                  value={customTopic}
+                  onChange={e => setCustomTopic(e.target.value)}
+                  maxLength={60}
+                />
+              )}
+
+              {aiMode === 'random' && (
+                <div className="flex items-center justify-center gap-2 py-4 text-sm text-slate-400 dark:text-slate-500">
+                  <Sparkles size={14} className="text-indigo-400" />
+                  <span>A surprise topic will be selected for you</span>
+                </div>
+              )}
+            </Card>
+          )}
+
           {/* Game Mode */}
           <Card>
             <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">
@@ -269,9 +381,11 @@ export default function Create() {
             type="submit"
             size="lg"
             className="w-full"
-            disabled={loading || !selectedQuizId || !nickname.trim()}
+            disabled={loading || !isFormReady}
           >
-            {loading ? 'Creating…' : 'Create Game'}
+            {loading
+              ? (source === 'AI_GENERATED' ? 'Generating…' : 'Creating…')
+              : 'Create Game'}
           </Button>
         </form>
       </div>
