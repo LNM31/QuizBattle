@@ -75,6 +75,7 @@ export function useGameWebSocket(
     if (!gameCode || !nickname) return
 
     let retryCount = 0
+    let connectTimer: ReturnType<typeof setTimeout> | null = null
     let retryTimer: ReturnType<typeof setTimeout> | null = null
     let intentionalClose = false
 
@@ -143,10 +144,13 @@ export function useGameWebSocket(
       }
     }
 
-    connect()
+    // Delay prevents StrictMode double-connect: cleanup fires before the 50ms timer,
+    // so the first (stale) WS is never created and can't overwrite the second's sessionId.
+    connectTimer = setTimeout(connect, 50)
 
     return () => {
       intentionalClose = true
+      if (connectTimer) clearTimeout(connectTimer)
       if (retryTimer) clearTimeout(retryTimer)
       if (wsRef.current) {
         wsRef.current.close()
