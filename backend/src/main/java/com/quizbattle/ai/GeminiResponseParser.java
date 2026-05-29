@@ -42,7 +42,7 @@ public class GeminiResponseParser {
         Question q = new Question();
         q.setQuiz(quiz);
         q.setText(dto.text);
-        q.setType(QuestionType.MCQ);
+        q.setType(resolveType(dto.type));
         q.setCorrectAnswer(dto.correctAnswer);
         q.setTimeLimitSeconds(20);
         try {
@@ -53,7 +53,18 @@ public class GeminiResponseParser {
         return q;
     }
 
+    // Gemini may omit "type" (older MCQ-only prompt) or send unexpected casing/values → default to MCQ
+    private QuestionType resolveType(String rawType) {
+        if (rawType == null || rawType.isBlank()) return QuestionType.MCQ;
+        try {
+            return QuestionType.valueOf(rawType.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return QuestionType.MCQ;
+        }
+    }
+
     private static class QuestionDto {
+        public String type;
         public String text;
         public String[] options;
         public String correctAnswer;

@@ -48,7 +48,7 @@ public class GeminiService {
         }
 
         String difficultyStr = request.getDifficulty() != null ? request.getDifficulty().name() : "MEDIUM";
-        String prompt = promptBuilder.buildMcqPrompt(topic, difficultyStr, request.getCount());
+        String prompt = promptBuilder.buildMixedPrompt(topic, difficultyStr, request.getCount());
 
         String responseText = geminiClient.generate(prompt);
 

@@ -1,4 +1,5 @@
 import { MCQRenderer } from './MCQRenderer'
+import { TrueFalseRenderer } from './TrueFalseRenderer'
 
 interface QuestionRendererProps {
   questionType: string
@@ -13,7 +14,8 @@ export function QuestionRenderer({ questionType, ...rest }: QuestionRendererProp
   switch (questionType) {
     case 'MCQ':
       return <MCQRenderer {...rest} />
-    // TODO: case 'TRUE_FALSE' → T13
+    case 'TRUE_FALSE':
+      return <TrueFalseRenderer {...rest} />
     // TODO: case 'ORDERING'  → T14
     // TODO: case 'ESTIMATION' → T21
     // TODO: case 'FILL_BLANK' → T21
