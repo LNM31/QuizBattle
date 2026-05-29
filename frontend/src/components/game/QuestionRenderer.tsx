@@ -1,5 +1,6 @@
 import { MCQRenderer } from './MCQRenderer'
 import { TrueFalseRenderer } from './TrueFalseRenderer'
+import { OrderingRenderer } from './OrderingRenderer'
 
 interface QuestionRendererProps {
   questionType: string
@@ -16,7 +17,8 @@ export function QuestionRenderer({ questionType, ...rest }: QuestionRendererProp
       return <MCQRenderer {...rest} />
     case 'TRUE_FALSE':
       return <TrueFalseRenderer {...rest} />
-    // TODO: case 'ORDERING'  → T14
+    case 'ORDERING':
+      return <OrderingRenderer {...rest} />
     // TODO: case 'ESTIMATION' → T21
     // TODO: case 'FILL_BLANK' → T21
     default:

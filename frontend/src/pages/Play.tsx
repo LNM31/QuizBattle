@@ -196,6 +196,7 @@ export default function Play() {
           )}
 
           <QuestionRenderer
+            key={currentQuestion.questionNumber}
             questionType={currentQuestion.questionType}
             options={currentQuestion.options}
             onAnswer={handleAnswer}
@@ -204,7 +205,8 @@ export default function Play() {
             revealedAnswer={revealData?.correctAnswer}
           />
 
-          {isRevealPhase && (
+          {/* ORDERING distribution is one bar per full order-string — not meaningful, so skip it */}
+          {isRevealPhase && currentQuestion.questionType !== 'ORDERING' && (
             <DistributionChart
               distribution={revealData.distribution}
               correctAnswer={revealData.correctAnswer}
