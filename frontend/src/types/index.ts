@@ -22,6 +22,13 @@ export interface GenerateQuizResponse {
   questionCount: number
 }
 
+// T17 — one MCQ being authored by the host in the manual editor (client-side shape).
+export interface ManualQuestionDraft {
+  text: string
+  options: string[]      // fixed length 4
+  correctIndex: number   // which option is correct
+}
+
 export type GameStatus = 'LOBBY' | 'PLAYING' | 'FINISHED'
 export type GameMode = 'CLASSIC' | 'SURVIVAL' | 'SOLO' | 'TEAM_BATTLE'
 export type QuestionType = 'MCQ' | 'TRUE_FALSE' | 'ORDERING' | 'ESTIMATION' | 'FILL_BLANK'

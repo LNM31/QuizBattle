@@ -8,8 +8,12 @@ import {
 import { Card } from '../components/ui/Card'
 import { Input } from '../components/ui/Input'
 import { Button } from '../components/ui/Button'
+import { ManualQuestionEditor } from '../components/ManualQuestionEditor'
+import { emptyQuestion, isQuestionValid } from '../lib/manualQuestions'
 import { api, ApiError } from '../lib/api'
-import type { QuizSummary, CreateGameResponse, GenerateQuizResponse } from '../types'
+import type { QuizSummary, CreateGameResponse, GenerateQuizResponse, ManualQuestionDraft } from '../types'
+
+const MIN_MANUAL_QUESTIONS = 5
 
 type Source = 'PREDEFINED' | 'AI_GENERATED' | 'MANUAL' | 'PDF_UPLOAD'
 type Mode = 'CLASSIC' | 'SURVIVAL' | 'SOLO' | 'TEAM_BATTLE'
@@ -18,7 +22,7 @@ type AiMode = 'domain' | 'custom' | 'random'
 const SOURCES: { id: Source; label: string; sub: string; icon: ComponentType<{ size?: number }>; enabled: boolean }[] = [
   { id: 'PREDEFINED',   label: 'Predefined',    sub: 'Curated sets',   icon: BookOpen,    enabled: true },
   { id: 'AI_GENERATED', label: 'AI Generated',  sub: 'Via Gemini',     icon: Sparkles,    enabled: true },
-  { id: 'MANUAL',       label: 'Manual',         sub: 'Write your own', icon: PencilLine,  enabled: false },
+  { id: 'MANUAL',       label: 'Manual',         sub: 'Write your own', icon: PencilLine,  enabled: true },
   { id: 'PDF_UPLOAD',   label: 'PDF Upload',     sub: 'From files',     icon: FileUp,      enabled: false },
 ]
 
@@ -59,6 +63,12 @@ export default function Create() {
   const [aiDomain, setAiDomain] = useState('')
   const [customTopic, setCustomTopic] = useState('')
 
+  // Manual source state — start with the minimum number of blank questions.
+  const [manualTitle, setManualTitle] = useState('')
+  const [manualQuestions, setManualQuestions] = useState<ManualQuestionDraft[]>(
+    () => Array.from({ length: MIN_MANUAL_QUESTIONS }, emptyQuestion)
+  )
+
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -94,9 +104,14 @@ export default function Create() {
     (aiMode === 'domain' && !!aiDomain) ||
     (aiMode === 'custom' && !!customTopic.trim())
 
+  const validManualCount = manualQuestions.filter(isQuestionValid).length
+  const isManualReady = validManualCount >= MIN_MANUAL_QUESTIONS
+
   const isFormReady =
     !!nickname.trim() &&
-    (source === 'AI_GENERATED' ? isAiReady : !!selectedQuizId)
+    (source === 'AI_GENERATED' ? isAiReady
+      : source === 'MANUAL' ? isManualReady
+      : !!selectedQuizId)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -116,6 +131,25 @@ export default function Create() {
           topic,
           difficulty: 'MEDIUM',
           count: 10,
+        })
+        quizId = result.quizId
+      }
+
+      if (source === 'MANUAL') {
+        // Send every question the host started (text or any option filled). Fully blank
+        // drafts are dropped; half-filled ones are sent so the backend returns a clear error.
+        const started = manualQuestions.filter(
+          q => q.text.trim() || q.options.some(o => o.trim())
+        )
+        const payload = started.map(q => ({
+          text: q.text.trim(),
+          options: q.options.map(o => o.trim()),
+          correctAnswer: q.options[q.correctIndex]?.trim() ?? '',
+        }))
+        const result = await api.post<GenerateQuizResponse>('/quiz', {
+          title: manualTitle.trim() || `${nickname.trim()}'s Quiz`,
+          difficulty: 'MEDIUM',
+          questions: payload,
         })
         quizId = result.quizId
       }
@@ -147,6 +181,11 @@ export default function Create() {
       if (err instanceof ApiError) {
         if (err.status === 503) {
           setError('Failed to generate questions. Please try again.')
+        } else if (err.status === 400) {
+          // Backend validation body is JSON { error, message } — show the message if present.
+          let msg = 'Please check your questions and try again.'
+          try { msg = JSON.parse(err.message).message ?? msg } catch { /* keep default */ }
+          setError(msg)
         } else {
           setError(`Error ${err.status}: Something went wrong. Please try again.`)
         }
@@ -331,6 +370,28 @@ export default function Create() {
                   <span>A surprise topic will be selected for you</span>
                 </div>
               )}
+            </Card>
+          )}
+
+          {/* Manual questions (Manual flow) */}
+          {source === 'MANUAL' && (
+            <Card>
+              <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">
+                Quiz Title
+              </p>
+              <Input
+                placeholder="My custom quiz"
+                value={manualTitle}
+                onChange={e => setManualTitle(e.target.value)}
+                maxLength={60}
+                autoComplete="off"
+                className="mb-5"
+              />
+              <ManualQuestionEditor
+                questions={manualQuestions}
+                onChange={setManualQuestions}
+                minQuestions={MIN_MANUAL_QUESTIONS}
+              />
             </Card>
           )}
 

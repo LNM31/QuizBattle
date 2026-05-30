@@ -1,6 +1,7 @@
 package com.quizbattle.controller;
 
 import com.quizbattle.ai.GeminiException;
+import com.quizbattle.dto.CreateQuizRequest;
 import com.quizbattle.dto.GenerateQuizRequest;
 import com.quizbattle.dto.GenerateQuizResponse;
 import com.quizbattle.dto.QuizResponse;
@@ -50,6 +51,19 @@ public class QuizController {
         } catch (GeminiException e) {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                     .body(Map.of("error", "AI generation failed", "message", e.getMessage()));
+        }
+    }
+
+    @PostMapping
+    public ResponseEntity<?> createManualQuiz(@RequestBody CreateQuizRequest request) {
+        try {
+            Quiz quiz = quizService.createManualQuiz(request);
+            return ResponseEntity.ok(
+                    new GenerateQuizResponse(quiz.getId(), quiz.getTitle(), quiz.getQuestions().size())
+            );
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "Invalid quiz", "message", e.getMessage()));
         }
     }
 }
