@@ -110,6 +110,9 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                 // Host: ws://server/ws/game/AB3K9X?nickname=Alex&hostToken=uuid-xxx
                 String hostToken = extractParam(session, "hostToken");
                 if (!activeGame.getHostToken().equals(hostToken)) return;
+                // Idempotent: a duplicate HOST_START (Solo auto-start retry, double-click) must not
+                // reach startGame() and throw "already started" — just ignore it.
+                if (activeGame.getGamePhase() != GamePhase.LOBBY) return;
                 gameService.startGame(gameCode);
                 broadcast(activeGame, OutgoingMessage.gameStart(activeGame.getQuestions().size(), activeGame.getMode().toString()));
                 sendQuestion(activeGame, 0);
@@ -329,6 +332,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
 
     private void broadcastGameOver(ActiveGame activeGame) throws IOException {
         List<ActivePlayer> sorted = activeGame.getSortedPlayers();
+        int questionsPlayed = activeGame.getCurrentQuestionIndex() + 1;
 
         List<Map<String, Object>> fullResults = new ArrayList<>();
         for (int i = 0; i < sorted.size(); i++) {
@@ -336,12 +340,18 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             double avgMs = p.getCorrectCount() > 0
                     ? (double) p.getTotalResponseTimeMs() / p.getCorrectCount()
                     : 0.0;
+            // Survival: an eliminated player only saw up to the question they went out on (same as endGame).
+            int playerTotalQuestions = p.isEliminated()
+                    ? p.getEliminatedAtQuestion() + 1
+                    : questionsPlayed;
 
             Map<String, Object> entry = new HashMap<>();
-            entry.put("position", i + 1);
+            entry.put("position", i + 1);       // podium reads "position" (PodiumEntry)
+            entry.put("finalPosition", i + 1);  // fullResults reads "finalPosition" (FullResult)
             entry.put("nickname", p.getNickname());
             entry.put("score", p.getScore());
             entry.put("correctCount", p.getCorrectCount());
+            entry.put("totalQuestions", playerTotalQuestions);
             entry.put("bestStreak", p.getBestStreak());
             entry.put("avgResponseMs", avgMs);
             fullResults.add(entry);

@@ -25,7 +25,7 @@ const SOURCES: { id: Source; label: string; sub: string; icon: ComponentType<{ s
 const MODES: { id: Mode; label: string; sub: string; icon: ComponentType<{ size?: number }>; enabled: boolean }[] = [
   { id: 'CLASSIC',     label: 'Classic',      sub: 'Play to the end', icon: Trophy, enabled: true },
   { id: 'SURVIVAL',    label: 'Survival',     sub: 'Wrong = out',     icon: Skull,  enabled: true },
-  { id: 'SOLO',        label: 'Solo',         sub: 'Play alone',      icon: User,   enabled: false },
+  { id: 'SOLO',        label: 'Solo',         sub: 'Play alone',      icon: User,   enabled: true },
   { id: 'TEAM_BATTLE', label: 'Team Battle',  sub: 'Team vs team',    icon: Users,  enabled: false },
 ]
 
@@ -130,7 +130,19 @@ export default function Create() {
       localStorage.setItem(`hostNickname_${gameCode}`, nickname.trim())
       await api.post(`/game/${gameCode}/join`, { nickname: nickname.trim() })
       sessionStorage.setItem('nickname', nickname.trim())
-      navigate('/lobby', { state: { gameCode } })
+      // Persist mode (always, so it overwrites any stale value) — Play reads it as the
+      // refresh-safe fallback for the `solo` flag.
+      sessionStorage.setItem('gameMode', mode)
+
+      if (mode === 'SOLO') {
+        // Solo skips the lobby entirely: go straight to the game and auto-start it.
+        // Persist code so a mid-game refresh can reconnect (autoStart stays in navigation
+        // state only, so the refresh won't try to re-start a running game).
+        sessionStorage.setItem('lobbyGameCode', gameCode)
+        navigate('/play', { state: { gameCode, autoStart: true, solo: true } })
+      } else {
+        navigate('/lobby', { state: { gameCode } })
+      }
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.status === 503) {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Skull } from 'lucide-react'
 import { useGameWebSocket, type WsMessage } from '../hooks/useGameWebSocket'
@@ -21,6 +21,8 @@ export default function Play() {
     nickname?: string
     hostToken?: string
     initialQuestion?: QuestionMsg
+    autoStart?: boolean
+    solo?: boolean
   } | null
 
   const [gameCode] = useState(
@@ -33,6 +35,12 @@ export default function Play() {
   const isHost =
     Boolean(hostToken) &&
     nickname === (localStorage.getItem(`hostNickname_${gameCode}`) ?? '')
+
+  // Solo: no lobby, the host (= the only player) auto-starts the game. `autoStart` lives
+  // only in navigation state (never storage) so a mid-game refresh won't re-fire it.
+  // `solo` also falls back to storage so the leaderboard stays hidden after a refresh.
+  const solo = locationState?.solo ?? sessionStorage.getItem('gameMode') === 'SOLO'
+  const autoStart = locationState?.autoStart === true
 
   const [score, setScore] = useState(0)
   const [streak, setStreak] = useState(0)
@@ -55,6 +63,17 @@ export default function Play() {
       navigate('/', { replace: true })
     }
   }, [gameCode, nickname, navigate])
+
+  // Solo auto-start: fire HOST_START exactly once, as soon as the socket is connected.
+  // Unlike multiplayer (where the lobby triggers the start), the Play socket itself sends
+  // it — so this same socket receives the first QUESTION; no initialQuestion handoff needed.
+  const startSentRef = useRef(false)
+  useEffect(() => {
+    if (autoStart && isHost && connected && !startSentRef.current) {
+      startSentRef.current = true
+      sendMessage({ type: 'HOST_START' })
+    }
+  }, [autoStart, isHost, connected, sendMessage])
 
   useEffect(() => {
     if (!lastMessage) return
@@ -101,11 +120,12 @@ export default function Play() {
             fullResults: lastMessage.fullResults,
             gameCode,
             nickname,
+            solo,
           },
         })
         break
     }
-  }, [lastMessage, navigate, gameCode, nickname, currentQuestion?.questionNumber])
+  }, [lastMessage, navigate, gameCode, nickname, solo, currentQuestion?.questionNumber])
 
   const handleAnswer = (answer: string) => {
     if (answered || iAmEliminated) return
@@ -133,8 +153,13 @@ export default function Play() {
   // Only show LEADERBOARD UI once leaderboardData is available
   const isLeaderboardPhase = gamePhase === 'LEADERBOARD' && leaderboardData != null
 
-  const isCorrect = isRevealPhase && answered && selectedAnswer === revealData.correctAnswer
-  const isWrong = isRevealPhase && answered && selectedAnswer !== revealData.correctAnswer
+  // Solo has no opponents: never render the competitive leaderboard list, and keep the reveal
+  // result on screen through the leaderboard gap instead of blanking the question out.
+  const showLeaderboardList = isLeaderboardPhase && !solo
+  const showResult = (isRevealPhase || (solo && isLeaderboardPhase)) && revealData != null
+
+  const isCorrect = showResult && answered && selectedAnswer === revealData?.correctAnswer
+  const isWrong = showResult && answered && selectedAnswer !== revealData?.correctAnswer
 
   return (
     <div className="max-w-2xl mx-auto space-y-5">
@@ -173,15 +198,15 @@ export default function Play() {
         <Timer key={currentQuestion.questionNumber} totalSeconds={currentQuestion.timeLimit} />
       )}
 
-      {/* Question + answer area (hidden during leaderboard) */}
-      {!isLeaderboardPhase && (
+      {/* Question + answer area (hidden during the competitive leaderboard) */}
+      {!showLeaderboardList && (
         <>
           <h2 className="text-xl md:text-2xl font-semibold text-slate-900 dark:text-slate-50 leading-snug">
             {currentQuestion.text}
           </h2>
 
           {/* Waiting banner — shown only while question is live (not for eliminated spectators) */}
-          {!iAmEliminated && answered && !isRevealPhase && (
+          {!iAmEliminated && answered && !showResult && (
             <div className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/20 px-4 py-2.5 text-center">
               <p className="text-sm font-medium text-indigo-600 dark:text-indigo-400">
                 Answer submitted. Waiting for results…
@@ -203,18 +228,18 @@ export default function Play() {
             <div className="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-4 py-2.5 text-center">
               <p className="text-sm font-medium text-red-600 dark:text-red-400">
                 Wrong! Correct answer was{' '}
-                <strong className="font-semibold">{revealData!.correctAnswer}</strong>
+                <strong className="font-semibold">{revealData?.correctAnswer}</strong>
               </p>
             </div>
           )}
 
           {/* Time's up (no answer submitted) — not for eliminated spectators */}
-          {isRevealPhase && !answered && !iAmEliminated && (
+          {showResult && !answered && !iAmEliminated && (
             <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 px-4 py-2.5 text-center">
               <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
                 Time's up. Correct answer was{' '}
                 <strong className="font-semibold text-slate-700 dark:text-slate-300">
-                  {revealData!.correctAnswer}
+                  {revealData?.correctAnswer}
                 </strong>
               </p>
             </div>
@@ -231,7 +256,7 @@ export default function Play() {
           />
 
           {/* ORDERING distribution is one bar per full order-string — not meaningful, so skip it */}
-          {isRevealPhase && currentQuestion.questionType !== 'ORDERING' && (
+          {showResult && revealData && currentQuestion.questionType !== 'ORDERING' && (
             <DistributionChart
               distribution={revealData.distribution}
               correctAnswer={revealData.correctAnswer}
@@ -242,8 +267,8 @@ export default function Play() {
         </>
       )}
 
-      {/* Leaderboard */}
-      {isLeaderboardPhase && (
+      {/* Leaderboard (multiplayer only — solo keeps the reveal result up instead) */}
+      {showLeaderboardList && (
         <div className="space-y-2.5">
           <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 text-center">
             Leaderboard
