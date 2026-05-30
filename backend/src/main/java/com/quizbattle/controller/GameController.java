@@ -21,7 +21,7 @@ public class GameController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public Map<String, String> createGame(@RequestBody CreateGameRequest request) {
-        return gameService.createGame(request.getQuizId(), request.getMode());
+        return gameService.createGame(request.getQuizId(), request.getMode(), request.getTimerSeconds());
     }
 
     @PostMapping("/{code}/join")

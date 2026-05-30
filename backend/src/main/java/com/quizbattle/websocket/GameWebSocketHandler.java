@@ -152,8 +152,10 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         long ts = System.currentTimeMillis();
         activeGame.setQuestionStartTimestamp(ts);
         activeGame.resetAnswers();
-        broadcast(activeGame, OutgoingMessage.question(q, parsedOptions, index + 1, activeGame.getQuestions().size(), ts));
-        scheduleQuestionTimeout(activeGame.getGameCode(), index, q.getTimeLimitSeconds());
+        // T18 — the host-configured timer overrides each question's stored time_limit_seconds.
+        int timeLimit = activeGame.getTimePerQuestion();
+        broadcast(activeGame, OutgoingMessage.question(q, parsedOptions, index + 1, activeGame.getQuestions().size(), ts, timeLimit));
+        scheduleQuestionTimeout(activeGame.getGameCode(), index, timeLimit);
     }
 
     private void scheduleQuestionTimeout(String gameCode, int questionIndex, int timeLimitSeconds) {
@@ -226,7 +228,8 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                 player.setCorrectCount(player.getCorrectCount() + 1);
                 long responseMs = player.getLastAnswerTimestamp() - activeGame.getQuestionStartTimestamp();
                 player.setTotalResponseTimeMs(player.getTotalResponseTimeMs() + responseMs);
-                int points = ScoreCalculator.calculate(responseMs, question.getTimeLimitSeconds(), newStreak);
+                // T18 — speed bonus is relative to the configured timer (same value the countdown uses).
+                int points = ScoreCalculator.calculate(responseMs, activeGame.getTimePerQuestion(), newStreak);
                 player.setScore(player.getScore() + points);
                 player.setLastPointsGained(points);
             } else {

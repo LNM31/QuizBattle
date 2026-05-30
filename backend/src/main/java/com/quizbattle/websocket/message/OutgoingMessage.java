@@ -33,7 +33,7 @@ public class OutgoingMessage {
 
     public static Map<String, Object> question(Question q, Object options,
                                                int questionNumber, int totalQuestions,
-                                               long timestamp) {
+                                               long timestamp, int timeLimitSeconds) {
         Map<String, Object> msg = new HashMap<>();
         msg.put("type", "QUESTION");
         msg.put("questionNumber", questionNumber);
@@ -41,7 +41,7 @@ public class OutgoingMessage {
         msg.put("text", q.getText());
         msg.put("questionType", q.getType().toString());
         msg.put("options", options); // parsed JSON
-        msg.put("timeLimit", q.getTimeLimitSeconds());
+        msg.put("timeLimit", timeLimitSeconds); // T18 — host-configured timer, overrides the question default
         msg.put("timestamp", timestamp);
         return msg;
     }

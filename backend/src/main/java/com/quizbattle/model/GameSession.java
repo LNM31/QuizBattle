@@ -36,6 +36,10 @@ public class GameSession {
     @Column(name = "player_count")
     private Integer playerCount;
 
+    // T18 — host-configured seconds per question (overrides each Question.timeLimitSeconds at runtime)
+    @Column(name = "time_per_question")
+    private Integer timePerQuestion;
+
     @Column(name = "started_at")
     private LocalDateTime startedAt;
 

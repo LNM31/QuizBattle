@@ -23,9 +23,14 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 public class GameService {
+    // T18 — allowed per-question timer values (seconds); anything else falls back to the default.
+    private static final Set<Integer> ALLOWED_TIMERS = Set.of(10, 15, 20, 30);
+    private static final int DEFAULT_TIMER_SECONDS = 20;
+
     private final GameSessionRepository gameSessionRepository;
     private final QuizRepository quizRepository;
     private final GameManager gameManager;
@@ -42,23 +47,34 @@ public class GameService {
         this.gameResultRepository = gameResultRepository;
     }
 
-    public Map<String, String> createGame(Long quizId, GameMode mode) {
+    public Map<String, String> createGame(Long quizId, GameMode mode, Integer timerSeconds) {
         Quiz quiz = quizRepository.findById(quizId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Quiz not found"));
 
+        int timePerQuestion = normalizeTimer(timerSeconds);
+
         ActiveGame activeGame = gameManager.createGame(quizId, mode);
+        activeGame.setTimePerQuestion(timePerQuestion); // the live game loop reads this per question
 
         GameSession session = new GameSession();
         session.setGameCode(activeGame.getGameCode());
         session.setQuiz(quiz);
         session.setMode(mode);
         session.setStatus(GameStatus.LOBBY);
+        session.setTimePerQuestion(timePerQuestion);
         gameSessionRepository.save(session);
 
         return Map.of(
           "gameCode", activeGame.getGameCode(),
           "hostToken", activeGame.getHostToken()
         );
+    }
+
+    // Only the host-facing presets are accepted; anything missing/out of range becomes the default.
+    private int normalizeTimer(Integer requested) {
+        return requested != null && ALLOWED_TIMERS.contains(requested)
+                ? requested
+                : DEFAULT_TIMER_SECONDS;
     }
 
     @Transactional

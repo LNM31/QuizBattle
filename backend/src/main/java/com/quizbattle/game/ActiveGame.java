@@ -18,6 +18,9 @@ public class ActiveGame {
     private GameMode mode;
     private String hostToken;
     private GamePhase gamePhase = GamePhase.LOBBY;
+    // T18 — seconds per question chosen by the host at create time. Default 20 keeps the
+    // pre-T18 behavior for any game created without an explicit timer.
+    private int timePerQuestion = 20;
     private List<Question> questions = new ArrayList<>();
     private int currentQuestionIndex = 0;
     private long questionStartTimestamp = 0L;

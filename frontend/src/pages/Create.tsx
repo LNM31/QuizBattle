@@ -15,9 +15,21 @@ import type { QuizSummary, CreateGameResponse, GenerateQuizResponse, ManualQuest
 
 const MIN_MANUAL_QUESTIONS = 5
 
+// T18 — Advanced Settings presets
+const TIMER_OPTIONS = [10, 15, 20, 30] as const   // seconds per question
+const MIN_AI_COUNT = 5
+const MAX_AI_COUNT = 20
+
 type Source = 'PREDEFINED' | 'AI_GENERATED' | 'MANUAL' | 'PDF_UPLOAD'
 type Mode = 'CLASSIC' | 'SURVIVAL' | 'SOLO' | 'TEAM_BATTLE'
 type AiMode = 'domain' | 'custom' | 'random'
+type Difficulty = 'EASY' | 'MEDIUM' | 'HARD'
+
+const DIFFICULTIES: { id: Difficulty; label: string }[] = [
+  { id: 'EASY', label: 'Easy' },
+  { id: 'MEDIUM', label: 'Medium' },
+  { id: 'HARD', label: 'Hard' },
+]
 
 const SOURCES: { id: Source; label: string; sub: string; icon: ComponentType<{ size?: number }>; enabled: boolean }[] = [
   { id: 'PREDEFINED',   label: 'Predefined',    sub: 'Curated sets',   icon: BookOpen,    enabled: true },
@@ -69,7 +81,12 @@ export default function Create() {
     () => Array.from({ length: MIN_MANUAL_QUESTIONS }, emptyQuestion)
   )
 
+  // Advanced settings (T18). Timer applies to every game; difficulty + count only feed AI generation.
   const [advancedOpen, setAdvancedOpen] = useState(false)
+  const [timerSeconds, setTimerSeconds] = useState<number>(20)
+  const [difficulty, setDifficulty] = useState<Difficulty>('MEDIUM')
+  const [questionCount, setQuestionCount] = useState<number>(10)
+
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -129,8 +146,8 @@ export default function Create() {
 
         const result = await api.post<GenerateQuizResponse>('/quiz/generate', {
           topic,
-          difficulty: 'MEDIUM',
-          count: 10,
+          difficulty,
+          count: questionCount,
         })
         quizId = result.quizId
       }
@@ -159,6 +176,7 @@ export default function Create() {
       const { gameCode, hostToken } = await api.post<CreateGameResponse>('/game', {
         quizId,
         mode,
+        timerSeconds,
       })
       localStorage.setItem(`hostToken_${gameCode}`, hostToken)
       localStorage.setItem(`hostNickname_${gameCode}`, nickname.trim())
@@ -440,9 +458,80 @@ export default function Create() {
               {advancedOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             </button>
             {advancedOpen && (
-              <p className="mt-3 text-sm text-center text-slate-400 dark:text-slate-500 py-3">
-                Timer, difficulty, and question count — coming in T18.
-              </p>
+              <div className="mt-4 flex flex-col gap-5 px-2 pb-1">
+                {/* Timer — applies to every source/mode */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                    Time per question
+                  </label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {TIMER_OPTIONS.map(sec => (
+                      <button
+                        key={sec}
+                        type="button"
+                        onClick={() => setTimerSeconds(sec)}
+                        className={[
+                          'py-2 rounded-lg text-sm font-medium border transition-all',
+                          timerSeconds === sec
+                            ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400'
+                            : 'border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-indigo-300 dark:hover:border-indigo-700',
+                        ].join(' ')}
+                      >
+                        {sec}s
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Difficulty + count only change AI generation — hidden for the other sources */}
+                {source === 'AI_GENERATED' && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                        Difficulty
+                      </label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {DIFFICULTIES.map(d => (
+                          <button
+                            key={d.id}
+                            type="button"
+                            onClick={() => setDifficulty(d.id)}
+                            className={[
+                              'py-2 rounded-lg text-sm font-medium border transition-all',
+                              difficulty === d.id
+                                ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400'
+                                : 'border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-indigo-300 dark:hover:border-indigo-700',
+                            ].join(' ')}
+                          >
+                            {d.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                        Number of questions
+                      </label>
+                      <Input
+                        type="number"
+                        min={MIN_AI_COUNT}
+                        max={MAX_AI_COUNT}
+                        value={questionCount}
+                        onChange={e => setQuestionCount(Number(e.target.value))}
+                        onBlur={() =>
+                          setQuestionCount(c =>
+                            Math.min(MAX_AI_COUNT, Math.max(MIN_AI_COUNT, Math.round(c) || MIN_AI_COUNT)),
+                          )
+                        }
+                      />
+                      <p className="mt-1.5 text-[11px] text-slate-400 dark:text-slate-500">
+                        Between {MIN_AI_COUNT} and {MAX_AI_COUNT}.
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
             )}
           </Card>
 
