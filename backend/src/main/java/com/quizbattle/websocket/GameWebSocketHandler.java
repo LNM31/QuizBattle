@@ -6,6 +6,7 @@ import com.quizbattle.game.GameManager;
 import com.quizbattle.game.GamePhase;
 import com.quizbattle.game.ScoreCalculator;
 import com.quizbattle.model.Question;
+import com.quizbattle.model.enums.GameMode;
 import com.quizbattle.service.GameService;
 import com.quizbattle.websocket.message.IncomingMessage;
 import com.quizbattle.websocket.message.OutgoingMessage;
@@ -19,7 +20,6 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -117,7 +117,8 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             case "ANSWER" -> {
                 if (activeGame.getGamePhase() != GamePhase.QUESTION) return;
                 ActivePlayer player = activeGame.getPlayers().get(nickname);
-                if (player == null || player.isAnswered()) return;
+                // eliminat (Survival) = spectator, nu mai poate raspunde
+                if (player == null || player.isAnswered() || player.isEliminated()) return;
 
                 boolean shouldReveal = false;
                 synchronized (activeGame) {
@@ -171,8 +172,16 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
 
     private void startRevealPhase(ActiveGame activeGame) throws IOException {
         Question currentQuestion = activeGame.getQuestions().get(activeGame.getCurrentQuestionIndex());
-        calculateAndApplyScores(activeGame, currentQuestion);
+        List<String> newlyEliminated = calculateAndApplyScores(activeGame, currentQuestion);
         broadcast(activeGame, buildRevealMessage(activeGame, currentQuestion));
+
+        // Survival: anunta cine a fost eliminat (greseala sau lipsa raspuns) + cati au mai ramas
+        if (activeGame.getMode() == GameMode.SURVIVAL && !newlyEliminated.isEmpty()) {
+            int remaining = activeGame.getRemainingPlayerCount();
+            for (String nick : newlyEliminated) {
+                broadcast(activeGame, OutgoingMessage.eliminated(nick, remaining));
+            }
+        }
 
         String gameCode = activeGame.getGameCode();
         scheduler.schedule(() -> {
@@ -191,14 +200,22 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         }, 4, TimeUnit.SECONDS);
     }
 
-    private void calculateAndApplyScores(ActiveGame activeGame, Question question) {
+    // Returneaza nickname-urile eliminate la runda asta (gol in alte moduri decat Survival).
+    private List<String> calculateAndApplyScores(ActiveGame activeGame, Question question) {
+        boolean survival = activeGame.getMode() == GameMode.SURVIVAL;
+        List<String> newlyEliminated = new ArrayList<>();
+
         for (ActivePlayer player : activeGame.getPlayers().values()) {
-            if (!player.isAnswered() || player.getLastAnswer() == null) {
-                player.setCurrentStreak(0);
+            // deja eliminat (Survival) => nu mai punctam, doar zerouam pointsGained pentru leaderboard
+            if (player.isEliminated()) {
                 player.setLastPointsGained(0);
                 continue;
             }
-            boolean correct = question.getCorrectAnswer().equals(player.getLastAnswer());
+
+            boolean correct = player.isAnswered()
+                    && player.getLastAnswer() != null
+                    && question.getCorrectAnswer().equals(player.getLastAnswer());
+
             if (correct) {
                 int newStreak = player.getCurrentStreak() + 1;
                 player.setCurrentStreak(newStreak);
@@ -212,8 +229,16 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             } else {
                 player.setCurrentStreak(0);
                 player.setLastPointsGained(0);
+                // greseala sau lipsa raspuns in Survival => eliminat
+                if (survival) {
+                    player.setEliminated(true);
+                    player.setEliminatedAtQuestion(activeGame.getCurrentQuestionIndex());
+                    newlyEliminated.add(player.getNickname());
+                }
             }
         }
+
+        return newlyEliminated;
     }
 
     private Map<String, Object> buildRevealMessage(ActiveGame activeGame, Question question) {
@@ -234,9 +259,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
     }
 
     private void broadcastLeaderboard(ActiveGame activeGame) throws IOException {
-        List<ActivePlayer> sorted = activeGame.getPlayers().values().stream()
-                .sorted(Comparator.comparingInt(ActivePlayer::getScore).reversed())
-                .toList();
+        List<ActivePlayer> sorted = activeGame.getSortedPlayers();
 
         Map<String, Integer> previousRankings = activeGame.getPreviousRankings();
         List<Map<String, Object>> entries = new ArrayList<>();
@@ -280,19 +303,23 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         ActiveGame activeGame = gameManager.getGame(gameCode).orElse(null);
         if (activeGame == null) return;
         int nextIndex;
-        boolean isLast;
+        boolean gameOver;
         synchronized (activeGame) {
             if (activeGame.getGamePhase() != GamePhase.LEADERBOARD) return;
             nextIndex = activeGame.getCurrentQuestionIndex() + 1;
-            isLast = nextIndex >= activeGame.getQuestions().size();
-            if (isLast) {
+            boolean isLastQuestion = nextIndex >= activeGame.getQuestions().size();
+            // Survival: jocul se termina si cand a mai ramas (cel mult) un singur supravietuitor
+            boolean survivalEnded = activeGame.getMode() == GameMode.SURVIVAL
+                    && activeGame.getRemainingPlayerCount() <= 1;
+            gameOver = isLastQuestion || survivalEnded;
+            if (gameOver) {
                 activeGame.setGamePhase(GamePhase.FINISHED);
             } else {
                 activeGame.setCurrentQuestionIndex(nextIndex);
                 activeGame.setGamePhase(GamePhase.QUESTION);
             }
         }
-        if (!isLast) {
+        if (!gameOver) {
             sendQuestion(activeGame, nextIndex);
         } else {
             broadcastGameOver(activeGame);
@@ -301,9 +328,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
     }
 
     private void broadcastGameOver(ActiveGame activeGame) throws IOException {
-        List<ActivePlayer> sorted = activeGame.getPlayers().values().stream()
-                .sorted(Comparator.comparingInt(ActivePlayer::getScore).reversed())
-                .toList();
+        List<ActivePlayer> sorted = activeGame.getSortedPlayers();
 
         List<Map<String, Object>> fullResults = new ArrayList<>();
         for (int i = 0; i < sorted.size(); i++) {

@@ -5,6 +5,7 @@ import com.quizbattle.model.enums.GameMode;
 import lombok.Data;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,7 +32,7 @@ public class ActiveGame {
     }
 
     public void addPlayer(String nickname, String webSocketSessionId) {
-        players.put(nickname, new ActivePlayer(nickname, webSocketSessionId, 0, 0, 0, 0, 0L, false, null, 0L, false, 0));
+        players.put(nickname, new ActivePlayer(nickname, webSocketSessionId, 0, 0, 0, 0, 0L, false, null, 0L, false, -1, 0));
     }
 
     public void removePlayer(String nickname) {
@@ -68,9 +69,40 @@ public class ActiveGame {
         players.values().forEach(activePlayer -> activePlayer.setAnswered(false));
     }
 
+    // Jucatorii eliminati (Survival) nu mai raspund => ii excludem ca sa nu blocheze tranzitia la REVEAL.
     public boolean allAnswered() {
         return players.values().stream()
                 .filter(ap -> ap.getWebSocketSessionId() != null)
+                .filter(ap -> !ap.isEliminated())
                 .allMatch(ActivePlayer::isAnswered);
+    }
+
+    // Cati jucatori sunt inca in viata (Survival). In alte moduri nimeni nu e eliminat => = totalul.
+    public int getRemainingPlayerCount() {
+        return (int) players.values().stream()
+                .filter(ap -> !ap.isEliminated())
+                .count();
+    }
+
+    // Ordinea de clasament. Pentru Survival: supravietuitorii primii, apoi cei eliminati mai tarziu,
+    // scorul ca tiebreaker. Pentru restul modurilor: pur si simplu dupa scor descrescator (ca inainte).
+    public List<ActivePlayer> getSortedPlayers() {
+        if (mode == GameMode.SURVIVAL) {
+            return players.values().stream()
+                    .sorted((a, b) -> {
+                        if (a.isEliminated() != b.isEliminated()) {
+                            return a.isEliminated() ? 1 : -1; // supravietuitorii inaintea celor eliminati
+                        }
+                        if (a.getEliminatedAtQuestion() != b.getEliminatedAtQuestion()) {
+                            // eliminat mai tarziu (index mai mare) = clasat mai sus
+                            return Integer.compare(b.getEliminatedAtQuestion(), a.getEliminatedAtQuestion());
+                        }
+                        return Integer.compare(b.getScore(), a.getScore());
+                    })
+                    .toList();
+        }
+        return players.values().stream()
+                .sorted(Comparator.comparingInt(ActivePlayer::getScore).reversed())
+                .toList();
     }
 }

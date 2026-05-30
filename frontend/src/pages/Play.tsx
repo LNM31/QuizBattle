@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { Skull } from 'lucide-react'
 import { useGameWebSocket, type WsMessage } from '../hooks/useGameWebSocket'
 import { PlayerHUD } from '../components/game/PlayerHUD'
 import { Timer } from '../components/game/Timer'
@@ -43,11 +44,11 @@ export default function Play() {
   const [revealData, setRevealData] = useState<RevealMsg | null>(null)
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardMsg | null>(null)
 
-  const { connected, gamePhase, lastMessage, sendMessage } = useGameWebSocket(
-    gameCode || null,
-    nickname,
-    hostToken,
-  )
+  const { connected, gamePhase, lastMessage, sendMessage, eliminatedPlayers, lastElimination } =
+    useGameWebSocket(gameCode || null, nickname, hostToken)
+
+  // Survival: once your nickname shows up in the eliminated set you become a spectator.
+  const iAmEliminated = eliminatedPlayers.includes(nickname)
 
   useEffect(() => {
     if (!gameCode || !nickname) {
@@ -107,7 +108,7 @@ export default function Play() {
   }, [lastMessage, navigate, gameCode, nickname, currentQuestion?.questionNumber])
 
   const handleAnswer = (answer: string) => {
-    if (answered) return
+    if (answered || iAmEliminated) return
     setSelectedAnswer(answer)
     setAnswered(true)
     sendMessage({ type: 'ANSWER', answer, timestamp: Date.now() })
@@ -144,6 +145,30 @@ export default function Play() {
         totalQuestions={currentQuestion.totalQuestions}
       />
 
+      {/* Survival — you're out, watching the rest */}
+      {iAmEliminated && (
+        <div className="flex items-center justify-center gap-2 rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-4 py-3 text-center">
+          <Skull size={16} className="text-red-500 flex-shrink-0" />
+          <p className="text-sm font-medium text-red-600 dark:text-red-400">
+            You've been eliminated — spectating the rest of the game
+          </p>
+        </div>
+      )}
+
+      {/* Survival — another player was just eliminated (shown only between questions) */}
+      {lastElimination &&
+        lastElimination.nickname !== nickname &&
+        (gamePhase === 'REVEAL' || gamePhase === 'LEADERBOARD') && (
+          <div className="flex items-center justify-center gap-2 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-4 py-2.5 text-center">
+            <Skull size={15} className="text-amber-500 flex-shrink-0" />
+            <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
+              <strong className="font-semibold">{lastElimination.nickname}</strong> was eliminated
+              {' · '}
+              {lastElimination.remainingPlayers} left
+            </p>
+          </div>
+        )}
+
       {showTimer && (
         <Timer key={currentQuestion.questionNumber} totalSeconds={currentQuestion.timeLimit} />
       )}
@@ -155,8 +180,8 @@ export default function Play() {
             {currentQuestion.text}
           </h2>
 
-          {/* Waiting banner — shown only while question is live */}
-          {answered && !isRevealPhase && (
+          {/* Waiting banner — shown only while question is live (not for eliminated spectators) */}
+          {!iAmEliminated && answered && !isRevealPhase && (
             <div className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/20 px-4 py-2.5 text-center">
               <p className="text-sm font-medium text-indigo-600 dark:text-indigo-400">
                 Answer submitted. Waiting for results…
@@ -183,8 +208,8 @@ export default function Play() {
             </div>
           )}
 
-          {/* Time's up (no answer submitted) */}
-          {isRevealPhase && !answered && (
+          {/* Time's up (no answer submitted) — not for eliminated spectators */}
+          {isRevealPhase && !answered && !iAmEliminated && (
             <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 px-4 py-2.5 text-center">
               <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
                 Time's up. Correct answer was{' '}
@@ -200,7 +225,7 @@ export default function Play() {
             questionType={currentQuestion.questionType}
             options={currentQuestion.options}
             onAnswer={handleAnswer}
-            answered={answered}
+            answered={answered || iAmEliminated}
             selectedAnswer={selectedAnswer}
             revealedAnswer={revealData?.correctAnswer}
           />

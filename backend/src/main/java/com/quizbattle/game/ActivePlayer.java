@@ -19,5 +19,6 @@ public class ActivePlayer {
     private String lastAnswer;
     private long lastAnswerTimestamp;
     private boolean eliminated;
+    private int eliminatedAtQuestion; // -1 daca nu e eliminat; altfel indexul intrebarii la care a fost eliminat (Survival)
     private int lastPointsGained;
 }

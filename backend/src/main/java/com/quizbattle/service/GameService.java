@@ -21,7 +21,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -134,11 +133,10 @@ public class GameService {
         GameSession gameSession = gameSessionRepository.findGameSessionByGameCode(gameCode)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Session not found"));
 
-        List<ActivePlayer> sorted = activeGame.getPlayers().values().stream()
-                .sorted(Comparator.comparingInt(ActivePlayer::getScore).reversed())
-                .toList();
+        List<ActivePlayer> sorted = activeGame.getSortedPlayers();
 
-        int totalQuestions = activeGame.getQuestions().size();
+        // Cate intrebari s-au jucat efectiv (in Survival jocul se poate termina mai devreme).
+        int questionsPlayed = activeGame.getCurrentQuestionIndex() + 1;
 
         List<GameResult> results = new ArrayList<>();
         for (int i = 0; i < sorted.size(); i++) {
@@ -147,12 +145,17 @@ public class GameService {
                     ? (double) p.getTotalResponseTimeMs() / p.getCorrectCount()
                     : 0.0;
 
+            // Un jucator eliminat a vazut doar pana la intrebarea la care a iesit; restul, tot ce s-a jucat.
+            int playerTotalQuestions = p.isEliminated()
+                    ? p.getEliminatedAtQuestion() + 1
+                    : questionsPlayed;
+
             GameResult result = new GameResult();
             result.setGameSession(gameSession);
             result.setPlayerNickname(p.getNickname());
             result.setFinalScore(p.getScore());
             result.setCorrectCount(p.getCorrectCount());
-            result.setTotalQuestions(totalQuestions);
+            result.setTotalQuestions(playerTotalQuestions);
             result.setBestStreak(p.getBestStreak());
             result.setAvgResponseMs(avgMs);
             result.setFinalPosition(i + 1);

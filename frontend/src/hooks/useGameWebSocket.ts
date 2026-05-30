@@ -68,6 +68,14 @@ export function useGameWebSocket(
   const [players, setPlayers] = useState<string[]>([])
   const [gamePhase, setGamePhase] = useState<GamePhase>('LOBBY')
   const [lastMessage, setLastMessage] = useState<WsMessage | null>(null)
+  // Survival mode: cumulative set of eliminated nicknames + the most recent elimination event.
+  // Maintained here (not via lastMessage) so a player's own elimination is never lost to React
+  // batching when several ELIMINATED messages arrive in the same tick.
+  const [eliminatedPlayers, setEliminatedPlayers] = useState<string[]>([])
+  const [lastElimination, setLastElimination] = useState<{
+    nickname: string
+    remainingPlayers: number
+  } | null>(null)
 
   const wsRef = useRef<WebSocket | null>(null)
 
@@ -106,12 +114,22 @@ export function useGameWebSocket(
             case 'GAME_START':
             case 'QUESTION':
               setGamePhase('QUESTION')
+              setLastElimination(null) // clear last round's elimination banner
               break
             case 'REVEAL':
               setGamePhase('REVEAL')
               break
             case 'LEADERBOARD':
               setGamePhase('LEADERBOARD')
+              break
+            case 'ELIMINATED':
+              setEliminatedPlayers(prev =>
+                prev.includes(msg.nickname) ? prev : [...prev, msg.nickname],
+              )
+              setLastElimination({
+                nickname: msg.nickname,
+                remainingPlayers: msg.remainingPlayers,
+              })
               break
             case 'GAME_OVER':
               setGamePhase('FINISHED')
@@ -165,5 +183,5 @@ export function useGameWebSocket(
     }
   }, [])
 
-  return { connected, players, gamePhase, lastMessage, sendMessage }
+  return { connected, players, gamePhase, lastMessage, sendMessage, eliminatedPlayers, lastElimination }
 }

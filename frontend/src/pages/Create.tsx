@@ -24,7 +24,7 @@ const SOURCES: { id: Source; label: string; sub: string; icon: ComponentType<{ s
 
 const MODES: { id: Mode; label: string; sub: string; icon: ComponentType<{ size?: number }>; enabled: boolean }[] = [
   { id: 'CLASSIC',     label: 'Classic',      sub: 'Play to the end', icon: Trophy, enabled: true },
-  { id: 'SURVIVAL',    label: 'Survival',     sub: 'Wrong = out',     icon: Skull,  enabled: false },
+  { id: 'SURVIVAL',    label: 'Survival',     sub: 'Wrong = out',     icon: Skull,  enabled: true },
   { id: 'SOLO',        label: 'Solo',         sub: 'Play alone',      icon: User,   enabled: false },
   { id: 'TEAM_BATTLE', label: 'Team Battle',  sub: 'Team vs team',    icon: Users,  enabled: false },
 ]

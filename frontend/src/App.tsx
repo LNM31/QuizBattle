@@ -6,6 +6,7 @@ import Create from './pages/Create'
 import Lobby from './pages/Lobby'
 import Play from './pages/Play'
 import End from './pages/End'
+import NotFound from './pages/NotFound'
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
           <Route path="lobby" element={<Lobby />} />
           <Route path="play" element={<Play />} />
           <Route path="end" element={<End />} />
+          <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>
     </BrowserRouter>

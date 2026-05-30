@@ -64,6 +64,14 @@ public class OutgoingMessage {
         return msg;
     }
 
+    public static Map<String, Object> eliminated(String nickname, int remainingPlayers) {
+        Map<String, Object> msg = new HashMap<>();
+        msg.put("type", "ELIMINATED");
+        msg.put("nickname", nickname);
+        msg.put("remainingPlayers", remainingPlayers);
+        return msg;
+    }
+
     public static Map<String, Object> gameOver(List<Map<String, Object>> podium, List<Map<String, Object>> fullResults) {
         Map<String, Object> msg = new HashMap<>();
         msg.put("type", "GAME_OVER");
