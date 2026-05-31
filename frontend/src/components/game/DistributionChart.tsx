@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react'
+
 interface DistributionChartProps {
   distribution: Record<string, number>
   correctAnswer: string
@@ -13,6 +15,15 @@ export function DistributionChart({
 }: DistributionChartProps) {
   const total = totalPlayers > 0 ? totalPlayers : 1
   const max = Math.max(...Object.values(distribution), 1)
+
+  // T22 — bars grow from 0 on mount. Component remounts each REVEAL phase,
+  // so the animation replays for every question. rAF defers the state flip
+  // to the next frame (avoids the React Compiler sync-setState-in-effect warning).
+  const [grown, setGrown] = useState(false)
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setGrown(true))
+    return () => cancelAnimationFrame(id)
+  }, [])
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm dark:shadow-none p-5 space-y-3">
@@ -47,13 +58,12 @@ export function DistributionChart({
                   {count} ({pct}%)
                 </span>
               </div>
-              {/* transition-none intentional — T22 adds growing animation */}
               <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
                 <div
-                  className={`h-full rounded-full transition-none ${
+                  className={`h-full rounded-full transition-[width] duration-700 ease-out motion-reduce:transition-none ${
                     isCorrect ? 'bg-green-500' : 'bg-slate-300 dark:bg-slate-600'
                   }`}
-                  style={{ width: `${barWidthPct}%` }}
+                  style={{ width: grown ? `${barWidthPct}%` : '0%' }}
                 />
               </div>
             </div>

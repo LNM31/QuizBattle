@@ -1,15 +1,31 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Trophy, Target, Flame, Clock, type LucideIcon } from 'lucide-react'
+import { Trophy, Target, Flame, Clock, ListChecks, type LucideIcon } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { Podium } from '../components/game/Podium'
 import { FinalScoreboard } from '../components/game/FinalScoreboard'
 import { TeamStandings } from '../components/game/TeamStandings'
 import { getTeam } from '../lib/teams'
+import { celebrate } from '../lib/confetti'
 import type { PodiumEntry } from '../components/game/Podium'
 import type { FullResult } from '../components/game/FinalScoreboard'
 import type { TeamStanding } from '../types'
+
+// Single stat tile reused by the solo + multiplayer end screens (T22 polish).
+function StatCard({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
+  return (
+    <div className="flex flex-col items-center gap-1 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-4 text-center shadow-sm dark:shadow-none">
+      <Icon size={18} className="text-slate-400 dark:text-slate-500" />
+      <span className="text-lg font-bold tabular-nums text-slate-900 dark:text-slate-50">
+        {value}
+      </span>
+      <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500 leading-tight">
+        {label}
+      </span>
+    </div>
+  )
+}
 
 type EndState = {
   podium: PodiumEntry[]
@@ -33,12 +49,22 @@ export default function End() {
   const navigate = useNavigate()
 
   const state = location.state as EndState | null
+  const celebrated = useRef(false)
 
   useEffect(() => {
     if (!state?.podium || !state?.fullResults) {
       navigate('/', { replace: true })
     }
   }, [state, navigate])
+
+  // T22 — fire confetti once when the end screen mounts; a bigger burst if you won.
+  useEffect(() => {
+    if (celebrated.current) return
+    if (!state?.podium || !state?.fullResults) return
+    celebrated.current = true
+    const me = state.fullResults.find(r => r.nickname === state.nickname)
+    celebrate(me?.finalPosition === 1)
+  }, [state])
 
   if (!state?.podium || !state?.fullResults) return null
 
@@ -101,19 +127,8 @@ export default function End() {
 
         {/* Personal stats */}
         <div className="grid grid-cols-3 gap-3">
-          {stats.map(({ icon: Icon, label, value }) => (
-            <div
-              key={label}
-              className="flex flex-col items-center gap-1 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-4 text-center shadow-sm dark:shadow-none"
-            >
-              <Icon size={18} className="text-slate-400 dark:text-slate-500" />
-              <span className="text-lg font-bold tabular-nums text-slate-900 dark:text-slate-50">
-                {value}
-              </span>
-              <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500 leading-tight">
-                {label}
-              </span>
-            </div>
+          {stats.map(s => (
+            <StatCard key={s.label} icon={s.icon} label={s.label} value={s.value} />
           ))}
         </div>
 
@@ -128,6 +143,16 @@ export default function End() {
       </div>
     )
   }
+
+  // Local player's performance for the stat cards below the podium.
+  const myAccuracy =
+    myResult && myResult.totalQuestions > 0
+      ? Math.round((myResult.correctCount / myResult.totalQuestions) * 100)
+      : 0
+  const myAvgTime =
+    myResult && myResult.correctCount > 0
+      ? `${(myResult.avgResponseMs / 1000).toFixed(1)}s`
+      : '—'
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 py-4">
@@ -167,6 +192,21 @@ export default function End() {
       )}
 
       {podium.length > 0 && <Podium entries={podium} myNickname={nickname} />}
+
+      {/* Your performance — accuracy, avg time, best streak, total questions */}
+      {myResult && (
+        <div className="space-y-2.5">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 text-center">
+            Your Performance
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <StatCard icon={Target} label="Accuracy" value={`${myAccuracy}%`} />
+            <StatCard icon={Clock} label="Avg Time" value={myAvgTime} />
+            <StatCard icon={Flame} label="Best Streak" value={String(myResult.bestStreak)} />
+            <StatCard icon={ListChecks} label="Questions" value={String(myResult.totalQuestions)} />
+          </div>
+        </div>
+      )}
 
       <FinalScoreboard results={fullResults} myNickname={nickname} />
 

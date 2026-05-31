@@ -14,8 +14,10 @@ interface PodiumProps {
   myNickname: string
 }
 
-// T22 extends: confetti + staggered entrance animations
 const MEDALS = ['🥇', '🥈', '🥉'] as const
+
+// Staggered entrance: bronze rises first, gold last (3rd → 2nd → 1st) for a build-up.
+const RISE_DELAY_MS: Record<number, number> = { 1: 300, 2: 150, 3: 0 }
 
 const POSITION: Record<number, { card: string; order: string; pad: string; medal: string; score: string }> = {
   1: {
@@ -52,8 +54,10 @@ export function Podium({ entries, myNickname }: PodiumProps) {
         return (
           <div
             key={entry.nickname}
+            style={{ animationDelay: `${RISE_DELAY_MS[entry.position] ?? 0}ms` }}
             className={[
               'flex-1 flex flex-col items-center text-center gap-2 rounded-2xl border p-5 shadow-sm dark:shadow-none',
+              'animate-podium-rise',
               s.card,
               s.order,
               s.pad,
