@@ -24,7 +24,7 @@ export default function NotFound() {
       </div>
 
       <Button variant="primary" size="md" onClick={() => navigate('/')}>
-        <Home size={16} className="mr-2" />
+        <Home size={16} />
         Back to Home
       </Button>
     </div>

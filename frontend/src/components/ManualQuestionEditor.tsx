@@ -74,7 +74,7 @@ export function ManualQuestionEditor({ questions, onChange, minQuestions }: Prop
                 onClick={() => move(qi, -1)}
                 disabled={qi === 0}
                 aria-label="Move question up"
-                className="p-1.5 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                className="p-2 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               >
                 <ChevronUp size={16} />
               </button>
@@ -83,7 +83,7 @@ export function ManualQuestionEditor({ questions, onChange, minQuestions }: Prop
                 onClick={() => move(qi, 1)}
                 disabled={qi === questions.length - 1}
                 aria-label="Move question down"
-                className="p-1.5 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                className="p-2 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               >
                 <ChevronDown size={16} />
               </button>
@@ -91,7 +91,7 @@ export function ManualQuestionEditor({ questions, onChange, minQuestions }: Prop
                 type="button"
                 onClick={() => removeQuestion(qi)}
                 aria-label="Delete question"
-                className="p-1.5 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
+                className="p-2 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
               >
                 <Trash2 size={16} />
               </button>
@@ -117,13 +117,13 @@ export function ManualQuestionEditor({ questions, onChange, minQuestions }: Prop
                     onClick={() => update(qi, { correctIndex: oi })}
                     aria-label={`Mark option ${oi + 1} as correct`}
                     className={[
-                      'shrink-0 w-7 h-7 rounded-full border flex items-center justify-center transition-colors',
+                      'shrink-0 w-8 h-8 rounded-full border flex items-center justify-center transition-colors active:scale-95',
                       correct
                         ? 'bg-green-500 border-green-500 text-white'
                         : 'border-slate-300 dark:border-slate-600 text-transparent hover:border-green-400',
                     ].join(' ')}
                   >
-                    <Check size={15} />
+                    <Check size={16} />
                   </button>
                   <Input
                     placeholder={`Option ${oi + 1}`}
@@ -143,7 +143,7 @@ export function ManualQuestionEditor({ questions, onChange, minQuestions }: Prop
       ))}
 
       <Button type="button" variant="ghost" onClick={addQuestion} className="w-full">
-        <Plus size={16} className="mr-1.5" />
+        <Plus size={16} />
         Add Question
       </Button>
     </div>

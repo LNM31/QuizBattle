@@ -14,8 +14,12 @@ public class CorsConfig {
         return new WebMvcConfigurer() {
             @Override
             public void addCorsMappings(@NonNull CorsRegistry registry) {
+                // T25 — in the normal (proxy) setup the browser only ever talks to the Vite
+                // dev server (same origin), so CORS never triggers. We still allow any origin
+                // here so the API works if hit directly (e.g. backend on its own ngrok tunnel).
+                // Safe because there is no auth / cookies (allowCredentials stays false).
                 registry.addMapping("/api/**")
-                        .allowedOrigins("http://localhost:5173")
+                        .allowedOriginPatterns("*")
                         .allowedMethods("GET", "POST", "PUT", "DELETE")
                         .allowedHeaders("*");
             }

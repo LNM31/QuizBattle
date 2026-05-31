@@ -1,3 +1,4 @@
+import { Loader2 } from 'lucide-react'
 import type { ButtonHTMLAttributes } from 'react'
 
 type Variant = 'primary' | 'secondary' | 'ghost'
@@ -8,6 +9,8 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant
   size?: Size
   btnState?: State
+  // T24 — when true, shows a spinner, keeps the label, and disables the button.
+  loading?: boolean
 }
 
 const variantClasses: Record<Variant, string> = {
@@ -19,7 +22,7 @@ const variantClasses: Record<Variant, string> = {
 
 const sizeClasses: Record<Size, string> = {
   sm: 'h-9 px-3 text-sm',
-  md: 'h-11 px-5 text-base',
+  md: 'h-12 px-5 text-base', // 48px — touch-friendly minimum (T24)
   lg: 'h-14 px-7 text-lg',
 }
 
@@ -33,14 +36,17 @@ export function Button({
   variant = 'primary',
   size = 'md',
   btnState = 'neutral',
+  loading = false,
   className = '',
+  disabled,
   children,
   ...props
 }: ButtonProps) {
   return (
     <button
       className={`
-        inline-flex items-center justify-center rounded-xl font-medium transition-all
+        inline-flex items-center justify-center gap-2 rounded-xl font-medium transition-all
+        touch-manipulation select-none
         hover:scale-[1.02] active:scale-[0.98]
         disabled:opacity-60 disabled:cursor-not-allowed disabled:scale-100
         ${variantClasses[variant]}
@@ -48,8 +54,10 @@ export function Button({
         ${stateClasses[btnState] ?? ''}
         ${className}
       `.trim()}
+      disabled={disabled || loading}
       {...props}
     >
+      {loading && <Loader2 size={18} className="animate-spin shrink-0" aria-hidden />}
       {children}
     </button>
   )

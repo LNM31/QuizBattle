@@ -22,11 +22,26 @@
       transform: translateY(0) scale(1);
     }
   }
+
+  /* T24 — subtle entrance for freshly loaded content (skeleton → real data, results, etc.) */
+  --animate-fade-in: fade-in 0.3s ease-out both;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(0.25rem);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
 }
 
 /* Respect users who prefer reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  .animate-podium-rise {
+  .animate-podium-rise,
+  .animate-fade-in {
     animation: none !important;
   }
 }
@@ -35,6 +50,25 @@
   box-sizing: border-box;
 }
 
+html {
+  /* Stop iOS/Android from inflating font sizes in landscape */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   margin: 0;
+  /* Phones should never scroll sideways, no matter how wide a code/word renders */
+  overflow-x: hidden;
+  /* Kill the grey flash overlay when tapping on mobile WebKit */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* T24 — touch-friendly: removes the 300ms tap delay + double-tap-to-zoom on controls,
+   so buttons feel instant under a finger. */
+button,
+a,
+label,
+[role='button'] {
+  touch-action: manipulation;
 }

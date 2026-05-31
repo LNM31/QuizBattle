@@ -76,11 +76,11 @@ function SortableRow({ id, index, total, disabled, revealState, onMove }: Sortab
         {index + 1}
       </span>
 
-      {/* Drag handle (only interactive while answering) */}
+      {/* Drag handle (only interactive while answering) — sized as a comfortable touch target */}
       {!disabled && (
         <button
           type="button"
-          className="cursor-grab touch-none text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 active:cursor-grabbing"
+          className="flex h-9 w-9 shrink-0 items-center justify-center cursor-grab touch-none text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 active:cursor-grabbing"
           aria-label="Drag to reorder"
           {...attributes}
           {...listeners}
@@ -93,26 +93,26 @@ function SortableRow({ id, index, total, disabled, revealState, onMove }: Sortab
         {id}
       </span>
 
-      {/* Up/down buttons — reliable fallback on touch devices */}
+      {/* Up/down buttons — reliable touch fallback; explicit tap targets so they're easy to hit */}
       {!disabled && (
-        <div className="flex flex-col">
+        <div className="flex flex-col shrink-0">
           <button
             type="button"
             disabled={index === 0}
             onClick={() => onMove(index, index - 1)}
             aria-label="Move up"
-            className="text-slate-400 hover:text-indigo-500 disabled:opacity-30 disabled:hover:text-slate-400"
+            className="flex h-7 w-8 items-center justify-center text-slate-400 hover:text-indigo-500 active:text-indigo-600 disabled:opacity-30 disabled:hover:text-slate-400"
           >
-            <ChevronUp className="h-4 w-4" />
+            <ChevronUp className="h-5 w-5" />
           </button>
           <button
             type="button"
             disabled={index === total - 1}
             onClick={() => onMove(index, index + 1)}
             aria-label="Move down"
-            className="text-slate-400 hover:text-indigo-500 disabled:opacity-30 disabled:hover:text-slate-400"
+            className="flex h-7 w-8 items-center justify-center text-slate-400 hover:text-indigo-500 active:text-indigo-600 disabled:opacity-30 disabled:hover:text-slate-400"
           >
-            <ChevronDown className="h-4 w-4" />
+            <ChevronDown className="h-5 w-5" />
           </button>
         </div>
       )}

@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { Check, Copy, Users } from 'lucide-react'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
+import { Skeleton } from '../components/ui/Skeleton'
 import { useGameWebSocket } from '../hooks/useGameWebSocket'
 import { api } from '../lib/api'
 import { getTeam } from '../lib/teams'
@@ -24,6 +25,7 @@ export default function Lobby() {
   const isHost = Boolean(hostToken) && nickname === (localStorage.getItem(`hostNickname_${gameCode}`) ?? '')
 
   const [quizTitle, setQuizTitle] = useState('')
+  const [titleLoading, setTitleLoading] = useState(true)
   const [copied, setCopied] = useState(false)
 
   const { connected, players, lastMessage, sendMessage, teamAssignments, teamCount } =
@@ -55,6 +57,7 @@ export default function Lobby() {
       .get<GameStateResponse>(`/game/${gameCode}`)
       .then(data => setQuizTitle(data.quizTitle))
       .catch(() => {})
+      .finally(() => setTitleLoading(false))
   }, [gameCode])
 
   // Navigate to play when the first QUESTION arrives.
@@ -89,23 +92,27 @@ export default function Lobby() {
         <p className="text-xs font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">
           Game Code
         </p>
-        <div className="flex items-center justify-center gap-3">
-          <span className="text-5xl font-bold font-mono tracking-widest text-slate-900 dark:text-slate-50">
+        <div className="flex items-center justify-center gap-2 sm:gap-3">
+          <span className="text-4xl sm:text-5xl font-bold font-mono tracking-widest text-slate-900 dark:text-slate-50">
             {gameCode}
           </span>
           <button
             onClick={handleCopy}
             aria-label="Copy game code"
-            className="p-2 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="p-2.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95 transition-all"
           >
             {copied
               ? <Check size={20} className="text-green-500" />
               : <Copy size={20} />}
           </button>
         </div>
-        {quizTitle && (
-          <p className="text-sm text-slate-500 dark:text-slate-400">{quizTitle}</p>
-        )}
+        {titleLoading ? (
+          <div className="flex justify-center pt-0.5">
+            <Skeleton className="h-4 w-40" />
+          </div>
+        ) : quizTitle ? (
+          <p className="text-sm text-slate-500 dark:text-slate-400 animate-fade-in">{quizTitle}</p>
+        ) : null}
       </Card>
 
       {/* Connection status */}

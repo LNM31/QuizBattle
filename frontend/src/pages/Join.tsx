@@ -81,8 +81,8 @@ export default function Join() {
             {error && (
               <p className="text-sm text-red-500">{error}</p>
             )}
-            <Button type="submit" size="lg" className="w-full mt-2" disabled={loading}>
-              {loading ? 'Joining...' : 'Join Game'}
+            <Button type="submit" size="lg" className="w-full mt-2" loading={loading}>
+              {loading ? 'Joining…' : 'Join Game'}
             </Button>
           </form>
         </Card>

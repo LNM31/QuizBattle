@@ -60,8 +60,9 @@ const AI_MODES: { id: AiMode; label: string }[] = [
 ]
 
 const selectCls =
+  // text-base (≥16px) keeps iOS Safari from auto-zooming when the native picker opens.
   'w-full h-12 px-4 rounded-lg border border-slate-200 dark:border-slate-700 ' +
-  'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-50 text-sm ' +
+  'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-50 text-base ' +
   'focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors'
 
 export default function Create() {
@@ -681,12 +682,20 @@ export default function Create() {
             type="submit"
             size="lg"
             className="w-full"
-            disabled={loading || !isFormReady}
+            loading={loading}
+            disabled={!isFormReady}
           >
             {loading
               ? (usesAiSettings ? 'Generating…' : 'Creating…')
               : 'Create Game'}
           </Button>
+
+          {/* Generation can take several seconds — set the expectation so it doesn't feel stuck */}
+          {loading && usesAiSettings && (
+            <p className="text-center text-xs text-slate-400 dark:text-slate-500">
+              Gemini is writing your questions — this can take a few seconds.
+            </p>
+          )}
         </form>
       </div>
     </div>

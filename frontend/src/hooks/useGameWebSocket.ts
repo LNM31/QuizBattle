@@ -1,7 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { TeamStanding } from '../types'
 
-const WS_BASE = 'ws://localhost:8080/ws/game'
+// T25 — derive the WebSocket base from the page origin so the same code works on
+// localhost (ws://localhost:5173 → Vite proxy → backend) and over ngrok
+// (wss://<id>.ngrok-free.app → ngrok TLS → Vite proxy → backend). Override with VITE_WS_URL.
+function wsBase(): string {
+  if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL
+  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  return `${proto}//${window.location.host}/ws/game`
+}
+
+const WS_BASE = wsBase()
 const MAX_RETRIES = 3
 const RETRY_DELAYS = [1000, 2000, 4000] as const
 
