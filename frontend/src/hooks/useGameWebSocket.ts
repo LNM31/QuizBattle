@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { TeamStanding } from '../types'
 
 const WS_BASE = 'ws://localhost:8080/ws/game'
 const MAX_RETRIES = 3
@@ -7,7 +8,15 @@ const RETRY_DELAYS = [1000, 2000, 4000] as const
 export type GamePhase = 'LOBBY' | 'QUESTION' | 'REVEAL' | 'LEADERBOARD' | 'FINISHED'
 
 export type WsMessage =
-  | { type: 'PLAYER_JOINED'; nickname: string; playerCount: number; players: string[] }
+  | {
+      type: 'PLAYER_JOINED'
+      nickname: string
+      playerCount: number
+      players: string[]
+      // T20 — present only in Team Battle: nickname -> teamId, plus the number of teams.
+      teamAssignments?: Record<string, number>
+      teamCount?: number
+    }
   | { type: 'PLAYER_LEFT'; nickname: string; playerCount: number }
   | { type: 'GAME_START'; totalQuestions: number; mode: string }
   | {
@@ -35,7 +44,9 @@ export type WsMessage =
         change: number
         pointsGained: number
         streak: number
+        teamId?: number // T20 — Team Battle only
       }>
+      teams?: TeamStanding[] // T20 — team standings alongside the individual ranking
     }
   | {
       type: 'GAME_OVER'
@@ -55,7 +66,9 @@ export type WsMessage =
         bestStreak: number
         avgResponseMs: number
         finalPosition: number
+        teamId?: number // T20 — Team Battle only
       }>
+      teams?: TeamStanding[] // T20 — final team standings (winner + MVP)
     }
   | { type: 'ELIMINATED'; nickname: string; remainingPlayers: number }
 
@@ -76,6 +89,10 @@ export function useGameWebSocket(
     nickname: string
     remainingPlayers: number
   } | null>(null)
+  // Team Battle: nickname -> teamId (and how many teams). Populated from PLAYER_JOINED, which
+  // the backend sends on every (re)connect, so it's complete by the time the game starts.
+  const [teamAssignments, setTeamAssignments] = useState<Record<string, number>>({})
+  const [teamCount, setTeamCount] = useState(0)
 
   const wsRef = useRef<WebSocket | null>(null)
 
@@ -107,6 +124,10 @@ export function useGameWebSocket(
           switch (msg.type) {
             case 'PLAYER_JOINED':
               setPlayers(msg.players)
+              if (msg.teamAssignments) {
+                setTeamAssignments(msg.teamAssignments) // full map each time, just replace
+                if (msg.teamCount) setTeamCount(msg.teamCount)
+              }
               break
             case 'PLAYER_LEFT':
               setPlayers(prev => prev.filter(p => p !== msg.nickname))
@@ -183,5 +204,9 @@ export function useGameWebSocket(
     }
   }, [])
 
-  return { connected, players, gamePhase, lastMessage, sendMessage, eliminatedPlayers, lastElimination }
+  return {
+    connected, players, gamePhase, lastMessage, sendMessage,
+    eliminatedPlayers, lastElimination,
+    teamAssignments, teamCount,
+  }
 }

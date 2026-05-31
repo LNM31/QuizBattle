@@ -6,12 +6,18 @@ import java.util.List;
 import java.util.Map;
 
 public class OutgoingMessage {
-    public static Map<String, Object> playerJoined(String nickname, int playerCount, List<String> players) {
+    public static Map<String, Object> playerJoined(String nickname, int playerCount, List<String> players,
+                                                   Map<String, Integer> teamAssignments, int teamCount) {
         Map<String, Object> msg = new HashMap<>();
         msg.put("type", "PLAYER_JOINED");
         msg.put("nickname", nickname);
         msg.put("playerCount", playerCount);
         msg.put("players", players);
+        // T20 — only present in Team Battle; lets the lobby colour players by team.
+        if (teamAssignments != null) {
+            msg.put("teamAssignments", teamAssignments);
+            msg.put("teamCount", teamCount);
+        }
         return msg;
     }
 
@@ -57,10 +63,12 @@ public class OutgoingMessage {
         return msg;
     }
 
-    public static Map<String, Object> leaderboard(List<Map<String, Object>> entries) {
+    public static Map<String, Object> leaderboard(List<Map<String, Object>> entries, List<Map<String, Object>> teams) {
         Map<String, Object> msg = new HashMap<>();
         msg.put("type", "LEADERBOARD");
         msg.put("leaderboard", entries);
+        // T20 — team standings alongside the individual ranking (null in non-team modes).
+        if (teams != null) msg.put("teams", teams);
         return msg;
     }
 
@@ -72,11 +80,14 @@ public class OutgoingMessage {
         return msg;
     }
 
-    public static Map<String, Object> gameOver(List<Map<String, Object>> podium, List<Map<String, Object>> fullResults) {
+    public static Map<String, Object> gameOver(List<Map<String, Object>> podium, List<Map<String, Object>> fullResults,
+                                               List<Map<String, Object>> teams) {
         Map<String, Object> msg = new HashMap<>();
         msg.put("type", "GAME_OVER");
         msg.put("podium", podium);
         msg.put("fullResults", fullResults);
+        // T20 — final team standings (winner = rank 1) + per-team MVP; null in non-team modes.
+        if (teams != null) msg.put("teams", teams);
         return msg;
     }
 }

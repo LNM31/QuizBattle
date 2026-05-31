@@ -30,6 +30,10 @@ public class GameService {
     // T18 — allowed per-question timer values (seconds); anything else falls back to the default.
     private static final Set<Integer> ALLOWED_TIMERS = Set.of(10, 15, 20, 30);
     private static final int DEFAULT_TIMER_SECONDS = 20;
+    // T20 — Team Battle: clamp the requested team count to [2, 4]; default 2.
+    private static final int DEFAULT_TEAM_COUNT = 2;
+    private static final int MIN_TEAMS = 2;
+    private static final int MAX_TEAMS = 4;
 
     private final GameSessionRepository gameSessionRepository;
     private final QuizRepository quizRepository;
@@ -47,7 +51,7 @@ public class GameService {
         this.gameResultRepository = gameResultRepository;
     }
 
-    public Map<String, String> createGame(Long quizId, GameMode mode, Integer timerSeconds) {
+    public Map<String, String> createGame(Long quizId, GameMode mode, Integer timerSeconds, Integer teamCount) {
         Quiz quiz = quizRepository.findById(quizId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Quiz not found"));
 
@@ -55,6 +59,8 @@ public class GameService {
 
         ActiveGame activeGame = gameManager.createGame(quizId, mode);
         activeGame.setTimePerQuestion(timePerQuestion); // the live game loop reads this per question
+        // T20 — set before any player joins, so round-robin team assignment at join uses it.
+        activeGame.setTeamCount(normalizeTeamCount(teamCount));
 
         GameSession session = new GameSession();
         session.setGameCode(activeGame.getGameCode());
@@ -75,6 +81,12 @@ public class GameService {
         return requested != null && ALLOWED_TIMERS.contains(requested)
                 ? requested
                 : DEFAULT_TIMER_SECONDS;
+    }
+
+    // T20 — clamp the requested team count into the supported [2, 4] range.
+    private int normalizeTeamCount(Integer requested) {
+        if (requested == null) return DEFAULT_TEAM_COUNT;
+        return Math.clamp(requested, MIN_TEAMS, MAX_TEAMS);
     }
 
     @Transactional

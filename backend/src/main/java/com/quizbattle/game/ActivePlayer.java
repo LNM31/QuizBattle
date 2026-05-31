@@ -21,4 +21,5 @@ public class ActivePlayer {
     private boolean eliminated;
     private int eliminatedAtQuestion; // -1 daca nu e eliminat; altfel indexul intrebarii la care a fost eliminat (Survival)
     private int lastPointsGained;
+    private int teamId; // T20 — doar pentru Team Battle; -1 daca jucatorul nu apartine niciunei echipe
 }

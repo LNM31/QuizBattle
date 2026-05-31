@@ -5,12 +5,16 @@ import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { Podium } from '../components/game/Podium'
 import { FinalScoreboard } from '../components/game/FinalScoreboard'
+import { TeamStandings } from '../components/game/TeamStandings'
+import { getTeam } from '../lib/teams'
 import type { PodiumEntry } from '../components/game/Podium'
 import type { FullResult } from '../components/game/FinalScoreboard'
+import type { TeamStanding } from '../types'
 
 type EndState = {
   podium: PodiumEntry[]
   fullResults: FullResult[]
+  teams?: TeamStanding[] | null // T20 — Team Battle final standings
   gameCode: string
   nickname: string
   solo?: boolean
@@ -38,8 +42,13 @@ export default function End() {
 
   if (!state?.podium || !state?.fullResults) return null
 
-  const { podium, fullResults, gameCode, nickname, solo } = state
+  const { podium, fullResults, teams, gameCode, nickname, solo } = state
   const myResult = fullResults.find(r => r.nickname === nickname)
+
+  // Team Battle: present + non-empty team standings drive the team UI (no mode flag needed).
+  const hasTeams = !!teams && teams.length > 0
+  const myTeamId = myResult?.teamId
+  const winningTeam = hasTeams ? teams!.find(t => t.rank === 1) : undefined
 
   const handleHome = () => {
     clearGameStorage(gameCode)
@@ -136,6 +145,26 @@ export default function End() {
           </p>
         )}
       </div>
+
+      {/* Team Battle — winning team + full team standings, above the individual podium */}
+      {hasTeams && (
+        <div className="space-y-4">
+          {winningTeam && (
+            <Card className={`text-center space-y-1 ${getTeam(winningTeam.teamId).soft} ${getTeam(winningTeam.teamId).ring}`}>
+              <div className="flex items-center justify-center gap-2">
+                <Trophy size={18} className="text-amber-500" />
+                <span className={`text-lg font-bold ${getTeam(winningTeam.teamId).text}`}>
+                  {getTeam(winningTeam.teamId).name} Team wins!
+                </span>
+              </div>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                {winningTeam.score.toLocaleString()} points
+              </p>
+            </Card>
+          )}
+          <TeamStandings teams={teams!} myTeamId={myTeamId} showMvp />
+        </div>
+      )}
 
       {podium.length > 0 && <Podium entries={podium} myNickname={nickname} />}
 

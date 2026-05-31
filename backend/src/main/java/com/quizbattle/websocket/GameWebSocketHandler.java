@@ -61,7 +61,14 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         ActivePlayer player = activeGame.getPlayers().get(nickname);
         player.setWebSocketSessionId(session.getId());
 
-        broadcast(activeGame, OutgoingMessage.playerJoined(nickname, activeGame.getConnectedPlayerCount(), activeGame.getConnectedPlayerNames()));
+        // T20 — in Team Battle, ship the team map so the lobby/play can colour players by team.
+        boolean teamBattle = activeGame.getMode() == GameMode.TEAM_BATTLE;
+        broadcast(activeGame, OutgoingMessage.playerJoined(
+                nickname,
+                activeGame.getConnectedPlayerCount(),
+                activeGame.getConnectedPlayerNames(),
+                teamBattle ? activeGame.getTeamAssignments() : null,
+                activeGame.getTeamCount()));
     }
 
     @Override
@@ -266,6 +273,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
 
     private void broadcastLeaderboard(ActiveGame activeGame) throws IOException {
         List<ActivePlayer> sorted = activeGame.getSortedPlayers();
+        boolean teamBattle = activeGame.getMode() == GameMode.TEAM_BATTLE;
 
         Map<String, Integer> previousRankings = activeGame.getPreviousRankings();
         List<Map<String, Object>> entries = new ArrayList<>();
@@ -282,6 +290,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             entry.put("change", change);
             entry.put("pointsGained", p.getLastPointsGained());
             entry.put("streak", p.getCurrentStreak());
+            if (teamBattle) entry.put("teamId", p.getTeamId()); // T20 — colour the row by team
             entries.add(entry);
         }
 
@@ -291,7 +300,9 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         }
         activeGame.setPreviousRankings(newRankings);
 
-        broadcast(activeGame, OutgoingMessage.leaderboard(entries));
+        // T20 — team standings travel next to the individual ranking (null in other modes).
+        List<Map<String, Object>> teams = teamBattle ? activeGame.getTeamStandings() : null;
+        broadcast(activeGame, OutgoingMessage.leaderboard(entries, teams));
     }
 
     private void scheduleNextQuestion(ActiveGame activeGame) {
@@ -335,6 +346,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
 
     private void broadcastGameOver(ActiveGame activeGame) throws IOException {
         List<ActivePlayer> sorted = activeGame.getSortedPlayers();
+        boolean teamBattle = activeGame.getMode() == GameMode.TEAM_BATTLE;
         int questionsPlayed = activeGame.getCurrentQuestionIndex() + 1;
 
         List<Map<String, Object>> fullResults = new ArrayList<>();
@@ -357,11 +369,14 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             entry.put("totalQuestions", playerTotalQuestions);
             entry.put("bestStreak", p.getBestStreak());
             entry.put("avgResponseMs", avgMs);
+            if (teamBattle) entry.put("teamId", p.getTeamId()); // T20 — colour the row by team
             fullResults.add(entry);
         }
 
         List<Map<String, Object>> podium = fullResults.subList(0, Math.min(3, fullResults.size()));
-        broadcast(activeGame, OutgoingMessage.gameOver(podium, fullResults));
+        // T20 — final team standings (winner + MVP) for the end screen; null in other modes.
+        List<Map<String, Object>> teams = teamBattle ? activeGame.getTeamStandings() : null;
+        broadcast(activeGame, OutgoingMessage.gameOver(podium, fullResults, teams));
     }
 
     private void broadcast(ActiveGame activeGame, Map<String, Object> payload) throws IOException {

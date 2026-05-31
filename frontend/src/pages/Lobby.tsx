@@ -5,6 +5,7 @@ import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { useGameWebSocket } from '../hooks/useGameWebSocket'
 import { api } from '../lib/api'
+import { getTeam } from '../lib/teams'
 import type { GameStateResponse } from '../types'
 
 export default function Lobby() {
@@ -25,11 +26,18 @@ export default function Lobby() {
   const [quizTitle, setQuizTitle] = useState('')
   const [copied, setCopied] = useState(false)
 
-  const { connected, players, lastMessage, sendMessage } = useGameWebSocket(
-    gameCode || null,
-    nickname,
-    hostToken,
-  )
+  const { connected, players, lastMessage, sendMessage, teamAssignments, teamCount } =
+    useGameWebSocket(gameCode || null, nickname, hostToken)
+
+  // Team Battle is signalled by the backend including a team count in PLAYER_JOINED.
+  const isTeamBattle = teamCount > 0
+  const teamTally = Array.from({ length: teamCount }, () => 0)
+  if (isTeamBattle) {
+    players.forEach(p => {
+      const t = teamAssignments[p]
+      if (t != null && t >= 0 && t < teamCount) teamTally[t]++
+    })
+  }
 
   // Persist gameCode to sessionStorage so refresh still works; redirect if missing
   useEffect(() => {
@@ -124,37 +132,74 @@ export default function Lobby() {
           </span>
         </div>
 
+        {/* Team tally (Team Battle only) */}
+        {isTeamBattle && (
+          <div className="flex flex-wrap gap-2 mb-4">
+            {teamTally.map((count, t) => {
+              const team = getTeam(t)
+              return (
+                <div
+                  key={t}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium ${team.soft} ${team.ring} ${team.text}`}
+                >
+                  <span className={`w-2 h-2 rounded-full ${team.dot}`} />
+                  {team.name}
+                  <span className="tabular-nums opacity-70">{count}</span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
         <div className="space-y-2">
           {players.length === 0 ? (
             <p className="text-sm text-slate-400 dark:text-slate-500 text-center py-4">
               Waiting for players to join…
             </p>
           ) : (
-            players.map(name => (
-              <div
-                key={name}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800"
-              >
-                <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center flex-shrink-0">
-                  <span className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">
-                    {name[0].toUpperCase()}
-                  </span>
-                </div>
-                <span className="font-medium text-slate-900 dark:text-slate-50 flex-1 min-w-0 truncate">
-                  {name}
-                </span>
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  {name === nickname && isHost && (
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 font-medium">
-                      host
+            players.map(name => {
+              const teamId = isTeamBattle ? teamAssignments[name] : undefined
+              const team = teamId != null && teamId >= 0 ? getTeam(teamId) : null
+              return (
+                <div
+                  key={name}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800"
+                >
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                      team ? team.soft : 'bg-indigo-100 dark:bg-indigo-900/50'
+                    }`}
+                  >
+                    <span
+                      className={`text-sm font-semibold ${
+                        team ? team.text : 'text-indigo-600 dark:text-indigo-400'
+                      }`}
+                    >
+                      {name[0].toUpperCase()}
                     </span>
-                  )}
-                  {name === nickname && (
-                    <span className="text-xs text-slate-400 dark:text-slate-500">you</span>
-                  )}
+                  </div>
+                  <span className="font-medium text-slate-900 dark:text-slate-50 flex-1 min-w-0 truncate">
+                    {name}
+                  </span>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {team && (
+                      <span className={`flex items-center gap-1 text-xs font-medium ${team.text}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${team.dot}`} />
+                        {team.name}
+                      </span>
+                    )}
+                    {name === nickname && isHost && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 font-medium">
+                        host
+                      </span>
+                    )}
+                    {name === nickname && (
+                      <span className="text-xs text-slate-400 dark:text-slate-500">you</span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))
+              )
+            })
           )}
         </div>
       </Card>

@@ -21,6 +21,9 @@ const TIMER_OPTIONS = [10, 15, 20, 30] as const   // seconds per question
 const MIN_AI_COUNT = 5
 const MAX_AI_COUNT = 20
 
+// T20 — Team Battle: number of teams the host can pick (matches backend [2, 4]).
+const TEAM_COUNT_OPTIONS = [2, 3, 4] as const
+
 // T19 — PDF upload limits (mirror of backend MAX_PDF_BYTES).
 const MAX_PDF_MB = 10
 const MAX_PDF_BYTES = MAX_PDF_MB * 1024 * 1024
@@ -47,7 +50,7 @@ const MODES: { id: Mode; label: string; sub: string; icon: ComponentType<{ size?
   { id: 'CLASSIC',     label: 'Classic',      sub: 'Play to the end', icon: Trophy, enabled: true },
   { id: 'SURVIVAL',    label: 'Survival',     sub: 'Wrong = out',     icon: Skull,  enabled: true },
   { id: 'SOLO',        label: 'Solo',         sub: 'Play alone',      icon: User,   enabled: true },
-  { id: 'TEAM_BATTLE', label: 'Team Battle',  sub: 'Team vs team',    icon: Users,  enabled: false },
+  { id: 'TEAM_BATTLE', label: 'Team Battle',  sub: 'Team vs team',    icon: Users,  enabled: true },
 ]
 
 const AI_MODES: { id: AiMode; label: string }[] = [
@@ -67,6 +70,7 @@ export default function Create() {
   const [nickname, setNickname] = useState('')
   const [source, setSource] = useState<Source>('PREDEFINED')
   const [mode, setMode] = useState<Mode>('CLASSIC')
+  const [teamCount, setTeamCount] = useState<number>(2) // T20 — only used in Team Battle
 
   // Predefined source state
   const [categories, setCategories] = useState<string[]>([])
@@ -214,6 +218,7 @@ export default function Create() {
         quizId,
         mode,
         timerSeconds,
+        teamCount, // T20 — backend ignores it outside Team Battle
       })
       localStorage.setItem(`hostToken_${gameCode}`, hostToken)
       localStorage.setItem(`hostNickname_${gameCode}`, nickname.trim())
@@ -549,6 +554,35 @@ export default function Create() {
                 )
               })}
             </div>
+
+            {/* Team Battle — number of teams (T20) */}
+            {mode === 'TEAM_BATTLE' && (
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Number of teams
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {TEAM_COUNT_OPTIONS.map(n => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setTeamCount(n)}
+                      className={[
+                        'py-2 rounded-lg text-sm font-medium border transition-all',
+                        teamCount === n
+                          ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400'
+                          : 'border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-indigo-300 dark:hover:border-indigo-700',
+                      ].join(' ')}
+                    >
+                      {n} teams
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-2 text-[11px] text-slate-400 dark:text-slate-500">
+                  Players are auto-assigned to balanced teams as they join.
+                </p>
+              </div>
+            )}
           </Card>
 
           {/* Advanced Settings */}

@@ -7,6 +7,8 @@ import { Timer } from '../components/game/Timer'
 import { QuestionRenderer } from '../components/game/QuestionRenderer'
 import { DistributionChart } from '../components/game/DistributionChart'
 import { LeaderboardEntry } from '../components/game/LeaderboardEntry'
+import { TeamStandings } from '../components/game/TeamStandings'
+import { getTeam } from '../lib/teams'
 
 type QuestionMsg = Extract<WsMessage, { type: 'QUESTION' }>
 type RevealMsg = Extract<WsMessage, { type: 'REVEAL' }>
@@ -52,11 +54,17 @@ export default function Play() {
   const [revealData, setRevealData] = useState<RevealMsg | null>(null)
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardMsg | null>(null)
 
-  const { connected, gamePhase, lastMessage, sendMessage, eliminatedPlayers, lastElimination } =
-    useGameWebSocket(gameCode || null, nickname, hostToken)
+  const {
+    connected, gamePhase, lastMessage, sendMessage,
+    eliminatedPlayers, lastElimination, teamAssignments,
+  } = useGameWebSocket(gameCode || null, nickname, hostToken)
 
   // Survival: once your nickname shows up in the eliminated set you become a spectator.
   const iAmEliminated = eliminatedPlayers.includes(nickname)
+
+  // Team Battle: my own team (undefined in other modes → all team UI is skipped).
+  const myTeamId = teamAssignments[nickname]
+  const myTeam = myTeamId != null && myTeamId >= 0 ? getTeam(myTeamId) : null
 
   useEffect(() => {
     if (!gameCode || !nickname) {
@@ -118,6 +126,7 @@ export default function Play() {
           state: {
             podium: lastMessage.podium,
             fullResults: lastMessage.fullResults,
+            teams: lastMessage.teams ?? null, // T20 — final team standings (null in other modes)
             gameCode,
             nickname,
             solo,
@@ -169,6 +178,16 @@ export default function Play() {
         questionNumber={currentQuestion.questionNumber}
         totalQuestions={currentQuestion.totalQuestions}
       />
+
+      {/* Team Battle — which team you're on */}
+      {myTeam && (
+        <div className={`flex items-center justify-center gap-2 rounded-xl border px-4 py-2 ${myTeam.soft} ${myTeam.ring}`}>
+          <span className={`w-2.5 h-2.5 rounded-full ${myTeam.dot}`} />
+          <p className={`text-sm font-medium ${myTeam.text}`}>
+            You're on the {myTeam.name} team
+          </p>
+        </div>
+      )}
 
       {/* Survival — you're out, watching the rest */}
       {iAmEliminated && (
@@ -269,22 +288,30 @@ export default function Play() {
 
       {/* Leaderboard (multiplayer only — solo keeps the reveal result up instead) */}
       {showLeaderboardList && (
-        <div className="space-y-2.5">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 text-center">
-            Leaderboard
-          </p>
-          {leaderboardData.leaderboard.map((entry, index) => (
-            <LeaderboardEntry
-              key={entry.nickname}
-              rank={index + 1}
-              nickname={entry.nickname}
-              score={entry.score}
-              pointsGained={entry.pointsGained}
-              streak={entry.streak}
-              change={entry.change}
-              isYou={entry.nickname === nickname}
-            />
-          ))}
+        <div className="space-y-4">
+          {/* Team Battle — cumulative team ranking sits above the individual one */}
+          {leaderboardData.teams && leaderboardData.teams.length > 0 && (
+            <TeamStandings teams={leaderboardData.teams} myTeamId={myTeamId} />
+          )}
+
+          <div className="space-y-2.5">
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 text-center">
+              Leaderboard
+            </p>
+            {leaderboardData.leaderboard.map((entry, index) => (
+              <LeaderboardEntry
+                key={entry.nickname}
+                rank={index + 1}
+                nickname={entry.nickname}
+                score={entry.score}
+                pointsGained={entry.pointsGained}
+                streak={entry.streak}
+                change={entry.change}
+                isYou={entry.nickname === nickname}
+                teamId={entry.teamId}
+              />
+            ))}
+          </div>
         </div>
       )}
 

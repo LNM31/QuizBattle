@@ -8,6 +8,7 @@ export type FullResult = {
   bestStreak: number
   avgResponseMs: number
   finalPosition: number
+  teamId?: number // T20 — Team Battle only
 }
 
 interface FinalScoreboardProps {
@@ -34,6 +35,7 @@ export function FinalScoreboard({ results, myNickname }: FinalScoreboardProps) {
           streak={result.bestStreak}
           change={0}
           isYou={result.nickname === myNickname}
+          teamId={result.teamId}
         />
       ))}
     </div>

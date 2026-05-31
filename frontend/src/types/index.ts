@@ -80,9 +80,20 @@ export interface FullResult {
   bestStreak: number
   avgResponseMs: number
   finalPosition: number
+  teamId?: number // T20 — only present in Team Battle
+}
+
+// T20 — one team's cumulative result (sum of member scores), ranked. mvp = top scorer in the team.
+export interface TeamStanding {
+  teamId: number
+  score: number
+  playerCount: number
+  rank: number
+  mvp: string | null
 }
 
 export interface GameOverData {
   podium: PodiumEntry[]
   fullResults: FullResult[]
+  teams?: TeamStanding[] // T20 — only present in Team Battle
 }

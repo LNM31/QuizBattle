@@ -1,4 +1,5 @@
 import { Flame, ChevronUp, ChevronDown, Minus } from 'lucide-react'
+import { getTeam } from '../../lib/teams'
 
 interface LeaderboardEntryProps {
   rank: number
@@ -8,6 +9,7 @@ interface LeaderboardEntryProps {
   streak: number
   change: number
   isYou: boolean
+  teamId?: number // T20 — Team Battle: renders a small team colour dot
 }
 
 export function LeaderboardEntry({
@@ -18,6 +20,7 @@ export function LeaderboardEntry({
   streak,
   change,
   isYou,
+  teamId,
 }: LeaderboardEntryProps) {
   return (
     // data-nickname and data-rank kept for T23 Framer Motion layoutId migration
@@ -35,6 +38,11 @@ export function LeaderboardEntry({
           <span className="text-slate-400 dark:text-slate-500 tabular-nums">{rank}</span>
         )}
       </span>
+
+      {/* Team colour dot (Team Battle only) */}
+      {teamId != null && teamId >= 0 && (
+        <span className={`w-2 h-2 rounded-full shrink-0 ${getTeam(teamId).dot}`} />
+      )}
 
       {/* Nickname */}
       <div className="flex-1 min-w-0">
