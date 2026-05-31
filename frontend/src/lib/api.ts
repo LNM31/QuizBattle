@@ -25,4 +25,7 @@ export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body: unknown) =>
     request<T>(path, { method: 'POST', body: JSON.stringify(body) }),
+  // multipart/form-data — headers cleared so the browser sets the boundary itself (T19 PDF upload).
+  postForm: <T>(path: string, form: FormData) =>
+    request<T>(path, { method: 'POST', body: form, headers: {} }),
 }

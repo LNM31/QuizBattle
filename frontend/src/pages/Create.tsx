@@ -4,6 +4,7 @@ import {
   ArrowLeft, ChevronDown, ChevronUp,
   BookOpen, Sparkles, PencilLine, FileUp,
   Trophy, Skull, User, Users,
+  FileText, X,
 } from 'lucide-react'
 import { Card } from '../components/ui/Card'
 import { Input } from '../components/ui/Input'
@@ -20,6 +21,10 @@ const TIMER_OPTIONS = [10, 15, 20, 30] as const   // seconds per question
 const MIN_AI_COUNT = 5
 const MAX_AI_COUNT = 20
 
+// T19 — PDF upload limits (mirror of backend MAX_PDF_BYTES).
+const MAX_PDF_MB = 10
+const MAX_PDF_BYTES = MAX_PDF_MB * 1024 * 1024
+
 type Source = 'PREDEFINED' | 'AI_GENERATED' | 'MANUAL' | 'PDF_UPLOAD'
 type Mode = 'CLASSIC' | 'SURVIVAL' | 'SOLO' | 'TEAM_BATTLE'
 type AiMode = 'domain' | 'custom' | 'random'
@@ -35,7 +40,7 @@ const SOURCES: { id: Source; label: string; sub: string; icon: ComponentType<{ s
   { id: 'PREDEFINED',   label: 'Predefined',    sub: 'Curated sets',   icon: BookOpen,    enabled: true },
   { id: 'AI_GENERATED', label: 'AI Generated',  sub: 'Via Gemini',     icon: Sparkles,    enabled: true },
   { id: 'MANUAL',       label: 'Manual',         sub: 'Write your own', icon: PencilLine,  enabled: true },
-  { id: 'PDF_UPLOAD',   label: 'PDF Upload',     sub: 'From files',     icon: FileUp,      enabled: false },
+  { id: 'PDF_UPLOAD',   label: 'PDF Upload',     sub: 'From a course',  icon: FileUp,      enabled: true },
 ]
 
 const MODES: { id: Mode; label: string; sub: string; icon: ComponentType<{ size?: number }>; enabled: boolean }[] = [
@@ -74,6 +79,10 @@ export default function Create() {
   const [aiDomains, setAiDomains] = useState<string[]>([])
   const [aiDomain, setAiDomain] = useState('')
   const [customTopic, setCustomTopic] = useState('')
+
+  // PDF source state (T19)
+  const [pdfFile, setPdfFile] = useState<File | null>(null)
+  const [pdfDragging, setPdfDragging] = useState(false)
 
   // Manual source state — start with the minimum number of blank questions.
   const [manualTitle, setManualTitle] = useState('')
@@ -124,11 +133,29 @@ export default function Create() {
   const validManualCount = manualQuestions.filter(isQuestionValid).length
   const isManualReady = validManualCount >= MIN_MANUAL_QUESTIONS
 
+  // PDF generation reuses the AI difficulty + count controls (T19).
+  const usesAiSettings = source === 'AI_GENERATED' || source === 'PDF_UPLOAD'
+
   const isFormReady =
     !!nickname.trim() &&
     (source === 'AI_GENERATED' ? isAiReady
       : source === 'MANUAL' ? isManualReady
+      : source === 'PDF_UPLOAD' ? !!pdfFile
       : !!selectedQuizId)
+
+  function pickPdf(file: File | null | undefined) {
+    if (!file) return
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      setError('Only PDF files are supported.')
+      return
+    }
+    if (file.size > MAX_PDF_BYTES) {
+      setError(`PDF is too large (max ${MAX_PDF_MB} MB).`)
+      return
+    }
+    setError('')
+    setPdfFile(file)
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -168,6 +195,16 @@ export default function Create() {
           difficulty: 'MEDIUM',
           questions: payload,
         })
+        quizId = result.quizId
+      }
+
+      if (source === 'PDF_UPLOAD') {
+        if (!pdfFile) { setError('Select a PDF file.'); return }
+        const form = new FormData()
+        form.append('file', pdfFile)
+        form.append('difficulty', difficulty)
+        form.append('count', String(questionCount))
+        const result = await api.postForm<GenerateQuizResponse>('/quiz/generate-from-pdf', form)
         quizId = result.quizId
       }
 
@@ -413,6 +450,73 @@ export default function Create() {
             </Card>
           )}
 
+          {/* PDF upload (PDF Upload flow) */}
+          {source === 'PDF_UPLOAD' && (
+            <Card>
+              <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">
+                Course PDF
+              </p>
+
+              {!pdfFile ? (
+                <label
+                  onDragOver={e => { e.preventDefault(); setPdfDragging(true) }}
+                  onDragLeave={() => setPdfDragging(false)}
+                  onDrop={e => {
+                    e.preventDefault()
+                    setPdfDragging(false)
+                    pickPdf(e.dataTransfer.files?.[0])
+                  }}
+                  className={[
+                    'flex flex-col items-center justify-center gap-2 text-center',
+                    'py-10 px-4 rounded-xl border-2 border-dashed cursor-pointer transition-colors',
+                    pdfDragging
+                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950'
+                      : 'border-slate-200 dark:border-slate-700 hover:border-indigo-400 dark:hover:border-indigo-500',
+                  ].join(' ')}
+                >
+                  <FileUp size={28} className="text-indigo-400" />
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Drag &amp; drop a PDF, or click to browse
+                  </span>
+                  <span className="text-[11px] text-slate-400 dark:text-slate-500">
+                    Course slides or lecture notes · max {MAX_PDF_MB} MB
+                  </span>
+                  <input
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    className="hidden"
+                    onChange={e => pickPdf(e.target.files?.[0])}
+                  />
+                </label>
+              ) : (
+                <div className="flex items-center gap-3 py-3 px-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
+                  <FileText size={20} className="text-indigo-500 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">
+                      {pdfFile.name}
+                    </p>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                      {(pdfFile.size / (1024 * 1024)).toFixed(1)} MB
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPdfFile(null)}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
+                    aria-label="Remove file"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              )}
+
+              <p className="mt-3 text-[11px] text-slate-400 dark:text-slate-500">
+                Gemini reads the document — including diagrams and tables — and writes the questions.
+                Tune difficulty and count in Advanced Settings.
+              </p>
+            </Card>
+          )}
+
           {/* Game Mode */}
           <Card>
             <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">
@@ -483,8 +587,8 @@ export default function Create() {
                   </div>
                 </div>
 
-                {/* Difficulty + count only change AI generation — hidden for the other sources */}
-                {source === 'AI_GENERATED' && (
+                {/* Difficulty + count feed AI/PDF generation — hidden for predefined/manual */}
+                {usesAiSettings && (
                   <>
                     <div>
                       <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
@@ -546,7 +650,7 @@ export default function Create() {
             disabled={loading || !isFormReady}
           >
             {loading
-              ? (source === 'AI_GENERATED' ? 'Generating…' : 'Creating…')
+              ? (usesAiSettings ? 'Generating…' : 'Creating…')
               : 'Create Game'}
           </Button>
         </form>
