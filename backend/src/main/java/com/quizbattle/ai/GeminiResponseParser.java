@@ -45,12 +45,20 @@ public class GeminiResponseParser {
         q.setType(resolveType(dto.type));
         q.setCorrectAnswer(dto.correctAnswer);
         q.setTimeLimitSeconds(20);
+        q.setOptions(serializeOptions(dto.options));
+        return q;
+    }
+
+    // options is a JSON array for MCQ/TRUE_FALSE/ORDERING and a JSON object for
+    // ESTIMATION ({"unit","hint"}) / FILL_BLANK ({"accepted":[...]}). Keep it generic and
+    // re-serialise whatever Gemini sent. Never null — the DB column is NOT NULL.
+    private String serializeOptions(Object options) {
+        if (options == null) return "{}";
         try {
-            q.setOptions(objectMapper.writeValueAsString(dto.options));
+            return objectMapper.writeValueAsString(options);
         } catch (Exception e) {
             throw new GeminiException("Failed to serialize options to JSON", e);
         }
-        return q;
     }
 
     // Gemini may omit "type" (older MCQ-only prompt) or send unexpected casing/values → default to MCQ
@@ -66,7 +74,8 @@ public class GeminiResponseParser {
     private static class QuestionDto {
         public String type;
         public String text;
-        public String[] options;
+        // Object (not String[]): array for MCQ/TRUE_FALSE/ORDERING, object for ESTIMATION/FILL_BLANK.
+        public Object options;
         public String correctAnswer;
     }
 }

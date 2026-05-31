@@ -23,11 +23,18 @@ public class DataSeeder implements CommandLineRunner {
 
     @Override
     public void run(String @NonNull ... args) {
-        if(quizRepository.count() > 0) return;
+        if (quizRepository.count() == 0) {
+            seedComputerScience();
+            seedIstorie();
+            seedGeografie();
+        }
 
-        seedComputerScience();
-        seedIstorie();
-        seedGeografie();
+        // T21 — deterministic quiz with all 5 question types, for testing/demo.
+        // Seeded by category check (not the count guard above) so it also appears on
+        // databases that were created before T21.
+        if (quizRepository.findQuizByCategory("Mixed Demo").isEmpty()) {
+            seedAllTypesDemo();
+        }
     }
 
     private void seedComputerScience() {
@@ -125,6 +132,52 @@ public class DataSeeder implements CommandLineRunner {
         ));
 
         quizRepository.save(quiz);
+    }
+
+    // T21 — one quiz that exercises every question type, so the full flow can be tested
+    // deterministically without depending on what Gemini happens to generate.
+    private void seedAllTypesDemo() {
+        Quiz quiz = new Quiz();
+        quiz.setTitle("All Question Types — Demo");
+        quiz.setCategory("Mixed Demo");
+        quiz.setSource(QuizSource.PREDEFINED);
+        quiz.setDifficulty(Difficulty.EASY);
+        quiz.setQuestions(List.of(
+                makeTyped(quiz, QuestionType.MCQ,
+                        "Care planetă este cea mai apropiată de Soare?",
+                        "[\"Venus\", \"Mercur\", \"Marte\", \"Pământ\"]", "Mercur"),
+                makeTyped(quiz, QuestionType.TRUE_FALSE,
+                        "Apa fierbe la 100°C la nivelul mării.",
+                        "[\"True\", \"False\"]", "True"),
+                makeTyped(quiz, QuestionType.ORDERING,
+                        "Așază planetele de la cea mai apropiată la cea mai depărtată de Soare",
+                        "[\"Pământ\", \"Mercur\", \"Marte\", \"Venus\"]", "Mercur,Venus,Pământ,Marte"),
+                makeTyped(quiz, QuestionType.ESTIMATION,
+                        "Estimează distanța medie dintre Pământ și Lună",
+                        "{\"unit\":\"km\",\"hint\":\"distanța medie\"}", "384400"),
+                makeTyped(quiz, QuestionType.ESTIMATION,
+                        "În ce an a pășit primul om pe Lună?",
+                        "{\"unit\":\"\",\"hint\":\"misiunea Apollo 11\"}", "1969"),
+                makeTyped(quiz, QuestionType.FILL_BLANK,
+                        "Protocolul folosit pentru a naviga pe web este _____",
+                        "{\"accepted\":[\"HTTP\",\"http\"]}", "HTTP"),
+                makeTyped(quiz, QuestionType.FILL_BLANK,
+                        "Cel mai mare ocean de pe Pământ este Oceanul _____",
+                        "{\"accepted\":[\"Pacific\",\"Pacificul\"]}", "Pacific")
+        ));
+        quizRepository.save(quiz);
+    }
+
+    private @NonNull Question makeTyped(Quiz quiz, QuestionType type, String text,
+                                        String options, String correctAnswer) {
+        Question question = new Question();
+        question.setQuiz(quiz);
+        question.setText(text);
+        question.setType(type);
+        question.setOptions(options);
+        question.setCorrectAnswer(correctAnswer);
+        question.setTimeLimitSeconds(20);
+        return question;
     }
 
     private @NonNull Question makeQuestion(Quiz quiz, String text, String options, String correctAnswer) {

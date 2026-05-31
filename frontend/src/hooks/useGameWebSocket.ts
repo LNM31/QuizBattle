@@ -25,7 +25,9 @@ export type WsMessage =
       totalQuestions: number
       text: string
       questionType: string
-      options: string[]
+      // Array for MCQ/TRUE_FALSE/ORDERING, object for ESTIMATION ({unit,hint}); FILL_BLANK sends {}.
+      // Typed as unknown — QuestionRenderer narrows it per questionType.
+      options: unknown
       timeLimit: number
       timestamp: number
     }

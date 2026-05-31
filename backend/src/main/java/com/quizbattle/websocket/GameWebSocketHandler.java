@@ -7,6 +7,7 @@ import com.quizbattle.game.GamePhase;
 import com.quizbattle.game.ScoreCalculator;
 import com.quizbattle.model.Question;
 import com.quizbattle.model.enums.GameMode;
+import com.quizbattle.model.enums.QuestionType;
 import com.quizbattle.service.GameService;
 import com.quizbattle.websocket.message.IncomingMessage;
 import com.quizbattle.websocket.message.OutgoingMessage;
@@ -156,6 +157,11 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
     private void sendQuestion(ActiveGame activeGame, int index) throws IOException {
         Question q = activeGame.getQuestions().get(index);
         Object parsedOptions = objectMapper.readValue(q.getOptions(), Object.class);
+        // T21 — anti-cheat: FILL_BLANK options hold the accepted answers; never ship them in QUESTION.
+        // ESTIMATION options ({unit,hint}) are only hints, so they are safe to send.
+        if (q.getType() == QuestionType.FILL_BLANK) {
+            parsedOptions = Map.of();
+        }
         long ts = System.currentTimeMillis();
         activeGame.setQuestionStartTimestamp(ts);
         activeGame.resetAnswers();
@@ -217,6 +223,12 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         boolean survival = activeGame.getMode() == GameMode.SURVIVAL;
         List<String> newlyEliminated = new ArrayList<>();
 
+        // T21 — per-question evaluation context, parsed once (not per player):
+        // FILL_BLANK needs the accepted list; ESTIMATION needs the numeric target.
+        QuestionType type = question.getType();
+        List<String> acceptedAnswers = type == QuestionType.FILL_BLANK ? parseAcceptedAnswers(question) : null;
+        Double estimationTarget = type == QuestionType.ESTIMATION ? parseNumber(question.getCorrectAnswer()) : null;
+
         for (ActivePlayer player : activeGame.getPlayers().values()) {
             // deja eliminat (Survival) => nu mai punctam, doar zerouam pointsGained pentru leaderboard
             if (player.isEliminated()) {
@@ -224,9 +236,10 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                 continue;
             }
 
-            boolean correct = player.isAnswered()
-                    && player.getLastAnswer() != null
-                    && question.getCorrectAnswer().equals(player.getLastAnswer());
+            // T21 — base points (before speed/streak): 0 = wrong / no points. Type-dependent:
+            // MCQ/TF/ORDERING exact match, FILL_BLANK accepted-list match, ESTIMATION proximity.
+            int basePoints = evaluateBasePoints(question, player, acceptedAnswers, estimationTarget);
+            boolean correct = basePoints > 0;
 
             if (correct) {
                 int newStreak = player.getCurrentStreak() + 1;
@@ -236,7 +249,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                 long responseMs = player.getLastAnswerTimestamp() - activeGame.getQuestionStartTimestamp();
                 player.setTotalResponseTimeMs(player.getTotalResponseTimeMs() + responseMs);
                 // T18 — speed bonus is relative to the configured timer (same value the countdown uses).
-                int points = ScoreCalculator.calculate(responseMs, activeGame.getTimePerQuestion(), newStreak);
+                int points = ScoreCalculator.calculate(basePoints, responseMs, activeGame.getTimePerQuestion(), newStreak);
                 player.setScore(player.getScore() + points);
                 player.setLastPointsGained(points);
             } else {
@@ -254,13 +267,72 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         return newlyEliminated;
     }
 
+    // T21 — base points for a player's answer (0 means no points / wrong).
+    private int evaluateBasePoints(Question question, ActivePlayer player,
+                                   List<String> acceptedAnswers, Double estimationTarget) {
+        if (!player.isAnswered() || player.getLastAnswer() == null) return 0;
+        String answer = player.getLastAnswer().trim();
+        if (answer.isEmpty()) return 0;
+
+        return switch (question.getType()) {
+            case ESTIMATION -> {
+                Double guess = parseNumber(answer);
+                yield (guess == null || estimationTarget == null)
+                        ? 0
+                        : ScoreCalculator.estimationBasePoints(guess, estimationTarget);
+            }
+            case FILL_BLANK -> {
+                boolean match = acceptedAnswers != null
+                        && acceptedAnswers.stream().anyMatch(a -> a.equalsIgnoreCase(answer));
+                yield match ? 1000 : 0;
+            }
+            // MCQ, TRUE_FALSE, ORDERING — exact string match (unchanged behaviour)
+            default -> question.getCorrectAnswer().equals(player.getLastAnswer()) ? 1000 : 0;
+        };
+    }
+
+    // FILL_BLANK options are {"accepted":[...]}. The primary correctAnswer is always added as a
+    // fallback, so matching still works even if Gemini forgets to repeat it in the list.
+    private List<String> parseAcceptedAnswers(Question question) {
+        List<String> accepted = new ArrayList<>();
+        if (question.getCorrectAnswer() != null && !question.getCorrectAnswer().isBlank()) {
+            accepted.add(question.getCorrectAnswer().trim());
+        }
+        try {
+            Object parsed = objectMapper.readValue(question.getOptions(), Object.class);
+            if (parsed instanceof Map<?, ?> map && map.get("accepted") instanceof List<?> list) {
+                for (Object item : list) {
+                    if (item != null && !item.toString().isBlank()) accepted.add(item.toString().trim());
+                }
+            }
+        } catch (Exception ignored) {
+            // malformed options → fall back to just the primary answer
+        }
+        return accepted;
+    }
+
+    // Lenient numeric parse for ESTIMATION: strips spaces and thousands separators. null = not a number.
+    private Double parseNumber(String raw) {
+        if (raw == null) return null;
+        String cleaned = raw.trim().replace(",", "").replace(" ", "");
+        if (cleaned.isEmpty()) return null;
+        try {
+            return Double.parseDouble(cleaned);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
     private Map<String, Object> buildRevealMessage(ActiveGame activeGame, Question question) {
         Map<String, Long> distribution = activeGame.getPlayers().values().stream()
                 .filter(p -> p.isAnswered() && p.getLastAnswer() != null)
                 .collect(Collectors.groupingBy(ActivePlayer::getLastAnswer, Collectors.counting()));
 
+        // T21 — "correct" is type-dependent (ESTIMATION = close enough, FILL_BLANK = accepted variant).
+        // calculateAndApplyScores already ran, so lastPointsGained > 0 means the player scored this round.
+        // For MCQ/TF/ORDERING this is identical to the old exact-match count (zero regression).
         long correctCount = activeGame.getPlayers().values().stream()
-                .filter(p -> p.isAnswered() && question.getCorrectAnswer().equals(p.getLastAnswer()))
+                .filter(p -> p.getLastPointsGained() > 0)
                 .count();
 
         return OutgoingMessage.reveal(

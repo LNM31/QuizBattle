@@ -167,8 +167,19 @@ export default function Play() {
   const showLeaderboardList = isLeaderboardPhase && !solo
   const showResult = (isRevealPhase || (solo && isLeaderboardPhase)) && revealData != null
 
-  const isCorrect = showResult && answered && selectedAnswer === revealData?.correctAnswer
-  const isWrong = showResult && answered && selectedAnswer !== revealData?.correctAnswer
+  // ESTIMATION/FILL_BLANK aren't exact-match: their renderer shows its own reveal feedback
+  // (closeness / accepted answer), so Play's generic Correct/Wrong banners are suppressed for them.
+  const selfReveal =
+    currentQuestion.questionType === 'ESTIMATION' ||
+    currentQuestion.questionType === 'FILL_BLANK'
+  // The distribution bar chart only makes sense when answers fall into a few buckets.
+  const showDistribution =
+    currentQuestion.questionType === 'MCQ' || currentQuestion.questionType === 'TRUE_FALSE'
+
+  const isCorrect =
+    !selfReveal && showResult && answered && selectedAnswer === revealData?.correctAnswer
+  const isWrong =
+    !selfReveal && showResult && answered && selectedAnswer !== revealData?.correctAnswer
 
   return (
     <div className="max-w-2xl mx-auto space-y-5">
@@ -252,8 +263,8 @@ export default function Play() {
             </div>
           )}
 
-          {/* Time's up (no answer submitted) — not for eliminated spectators */}
-          {showResult && !answered && !iAmEliminated && (
+          {/* Time's up (no answer submitted) — not for eliminated spectators or self-reveal types */}
+          {showResult && !answered && !iAmEliminated && !selfReveal && (
             <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 px-4 py-2.5 text-center">
               <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
                 Time's up. Correct answer was{' '}
@@ -274,8 +285,8 @@ export default function Play() {
             revealedAnswer={revealData?.correctAnswer}
           />
 
-          {/* ORDERING distribution is one bar per full order-string — not meaningful, so skip it */}
-          {showResult && revealData && currentQuestion.questionType !== 'ORDERING' && (
+          {/* Distribution only for MCQ/TRUE_FALSE — ORDERING/ESTIMATION/FILL_BLANK have too many distinct answers */}
+          {showResult && revealData && showDistribution && (
             <DistributionChart
               distribution={revealData.distribution}
               correctAnswer={revealData.correctAnswer}
