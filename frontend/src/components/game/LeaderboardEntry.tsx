@@ -1,4 +1,5 @@
 import { Flame, ChevronUp, ChevronDown, Minus } from 'lucide-react'
+import { motion, useReducedMotion } from 'motion/react'
 import { getTeam } from '../../lib/teams'
 
 interface LeaderboardEntryProps {
@@ -10,6 +11,9 @@ interface LeaderboardEntryProps {
   change: number
   isYou: boolean
   teamId?: number // T20 — Team Battle: renders a small team colour dot
+  // T23 — Play's live leaderboard animates row reordering + floating points.
+  // FinalScoreboard renders the same row statically, so it leaves this off.
+  animateMove?: boolean
 }
 
 export function LeaderboardEntry({
@@ -21,12 +25,20 @@ export function LeaderboardEntry({
   change,
   isYou,
   teamId,
+  animateMove = false,
 }: LeaderboardEntryProps) {
+  const reduceMotion = useReducedMotion()
+  const animate = animateMove && !reduceMotion
+
   return (
-    // data-nickname and data-rank kept for T23 Framer Motion layoutId migration
-    <div
+    // T23 — motion.div with `layout` glides the row to its new slot when the list reorders.
+    // data-nickname / data-rank kept for debugging the position mapping.
+    <motion.div
+      layout={animate ? 'position' : false}
+      transition={{ type: 'spring', stiffness: 600, damping: 45 }}
       data-nickname={nickname}
-      className={`flex items-center gap-3 rounded-2xl border px-4 py-3 shadow-sm dark:shadow-none ${
+      data-rank={rank}
+      className={`relative flex items-center gap-3 rounded-2xl border px-4 py-3 shadow-sm dark:shadow-none ${
         isYou
           ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800'
           : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800'
@@ -60,12 +72,23 @@ export function LeaderboardEntry({
         </p>
       </div>
 
-      {/* Points gained this round */}
-      {pointsGained > 0 && (
-        <span className="text-xs font-semibold text-green-600 dark:text-green-400 shrink-0 tabular-nums">
-          +{pointsGained.toLocaleString()}
-        </span>
-      )}
+      {/* Points gained this round — T23: floats up and fades out on the live leaderboard;
+          static badge when motion is disabled (reduced-motion) or in FinalScoreboard. */}
+      {pointsGained > 0 &&
+        (animate ? (
+          <motion.span
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: [0, 1, 1, 0], y: [6, -6, -16, -26] }}
+            transition={{ duration: 1.8, times: [0, 0.15, 0.55, 1], delay: 0.25 }}
+            className="pointer-events-none absolute right-16 top-1.5 text-xs font-bold text-green-500 dark:text-green-400 tabular-nums"
+          >
+            +{pointsGained.toLocaleString()}
+          </motion.span>
+        ) : (
+          <span className="text-xs font-semibold text-green-600 dark:text-green-400 shrink-0 tabular-nums">
+            +{pointsGained.toLocaleString()}
+          </span>
+        ))}
 
       {/* Streak flame — only shown at 3+ */}
       {streak >= 3 && (
@@ -80,22 +103,24 @@ export function LeaderboardEntry({
         {score.toLocaleString()}
       </span>
 
-      {/* Position change — T23 animates this */}
+      {/* Position change — T23: pops in after the row has settled into place */}
       <div className="shrink-0 w-8 flex items-center justify-end">
-        {change > 0 ? (
-          <div className="flex items-center gap-0.5 text-green-500">
-            <ChevronUp size={14} />
-            <span className="text-xs font-semibold">{change}</span>
-          </div>
-        ) : change < 0 ? (
-          <div className="flex items-center gap-0.5 text-red-500">
-            <ChevronDown size={14} />
+        {change !== 0 ? (
+          <motion.div
+            initial={animate ? { scale: 0.4, opacity: 0 } : false}
+            animate={animate ? { scale: 1, opacity: 1 } : undefined}
+            transition={{ duration: 0.3, delay: 0.3 }}
+            className={`flex items-center gap-0.5 ${
+              change > 0 ? 'text-green-500' : 'text-red-500'
+            }`}
+          >
+            {change > 0 ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             <span className="text-xs font-semibold">{Math.abs(change)}</span>
-          </div>
+          </motion.div>
         ) : (
           <Minus size={12} className="text-slate-300 dark:text-slate-600" />
         )}
       </div>
-    </div>
+    </motion.div>
   )
 }

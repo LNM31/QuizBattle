@@ -6,7 +6,7 @@ import { PlayerHUD } from '../components/game/PlayerHUD'
 import { Timer } from '../components/game/Timer'
 import { QuestionRenderer } from '../components/game/QuestionRenderer'
 import { DistributionChart } from '../components/game/DistributionChart'
-import { LeaderboardEntry } from '../components/game/LeaderboardEntry'
+import { Leaderboard } from '../components/game/Leaderboard'
 import { TeamStandings } from '../components/game/TeamStandings'
 import { getTeam } from '../lib/teams'
 
@@ -309,19 +309,7 @@ export default function Play() {
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 text-center">
               Leaderboard
             </p>
-            {leaderboardData.leaderboard.map((entry, index) => (
-              <LeaderboardEntry
-                key={entry.nickname}
-                rank={index + 1}
-                nickname={entry.nickname}
-                score={entry.score}
-                pointsGained={entry.pointsGained}
-                streak={entry.streak}
-                change={entry.change}
-                isYou={entry.nickname === nickname}
-                teamId={entry.teamId}
-              />
-            ))}
+            <Leaderboard entries={leaderboardData.leaderboard} myNickname={nickname} />
           </div>
         </div>
       )}
