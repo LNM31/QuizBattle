@@ -1,4 +1,4 @@
-import { Flame, ChevronUp, ChevronDown, Minus } from 'lucide-react'
+import { Flame, ChevronUp, ChevronDown, Minus, Medal } from 'lucide-react'
 import { motion, useReducedMotion } from 'motion/react'
 import { getTeam } from '../../lib/teams'
 
@@ -45,9 +45,20 @@ export function LeaderboardEntry({
       }`}
     >
       {/* Rank */}
-      <span className="w-7 text-center text-sm font-bold shrink-0">
-        {rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : (
-          <span className="text-slate-400 dark:text-slate-500 tabular-nums">{rank}</span>
+      <span className="w-7 flex items-center justify-center shrink-0">
+        {rank <= 3 ? (
+          <Medal
+            size={18}
+            className={
+              rank === 1
+                ? 'text-amber-400'
+                : rank === 2
+                  ? 'text-slate-400'
+                  : 'text-amber-700 dark:text-amber-600'
+            }
+          />
+        ) : (
+          <span className="text-sm font-bold text-slate-400 dark:text-slate-500 tabular-nums">{rank}</span>
         )}
       </span>
 

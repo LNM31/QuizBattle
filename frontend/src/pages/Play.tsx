@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Skull } from 'lucide-react'
+import { Skull, SkipForward } from 'lucide-react'
+import { Button } from '../components/ui/Button'
 import { useGameWebSocket, type WsMessage } from '../hooks/useGameWebSocket'
 import { PlayerHUD } from '../components/game/PlayerHUD'
 import { Timer } from '../components/game/Timer'
@@ -205,7 +206,7 @@ export default function Play() {
         <div className="flex items-center justify-center gap-2 rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-4 py-3 text-center">
           <Skull size={16} className="text-red-500 flex-shrink-0" />
           <p className="text-sm font-medium text-red-600 dark:text-red-400">
-            You've been eliminated — spectating the rest of the game
+            You've been eliminated - spectating the rest of the game
           </p>
         </div>
       )}
@@ -315,12 +316,15 @@ export default function Play() {
       )}
 
       {isHost && gamePhase === 'LEADERBOARD' && (
-        <button
+        <Button
+          variant="secondary"
+          size="md"
           onClick={() => sendMessage({ type: 'HOST_NEXT' })}
-          className="w-full text-center text-sm text-indigo-500 dark:text-indigo-400 hover:underline py-2"
+          className="w-full"
         >
+          <SkipForward size={18} />
           Skip to next question
-        </button>
+        </Button>
       )}
     </div>
   )

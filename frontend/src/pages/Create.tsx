@@ -517,7 +517,7 @@ export default function Create() {
               )}
 
               <p className="mt-3 text-[11px] text-slate-400 dark:text-slate-500">
-                Gemini reads the document — including diagrams and tables — and writes the questions.
+                Gemini reads the document, including diagrams and tables, and writes the questions.
                 Tune difficulty and count in Advanced Settings.
               </p>
             </Card>
@@ -693,7 +693,7 @@ export default function Create() {
           {/* Generation can take several seconds — set the expectation so it doesn't feel stuck */}
           {loading && usesAiSettings && (
             <p className="text-center text-xs text-slate-400 dark:text-slate-500">
-              Gemini is writing your questions — this can take a few seconds.
+              Gemini is writing your questions. This can take a few seconds.
             </p>
           )}
         </form>

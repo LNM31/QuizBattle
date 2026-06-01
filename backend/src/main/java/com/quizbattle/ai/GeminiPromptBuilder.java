@@ -37,6 +37,8 @@ public class GeminiPromptBuilder {
               answer (include common synonyms / spellings; matching is case-insensitive).
               "correctAnswer" is the primary accepted answer, a single word or short phrase.
 
+            Never use the long dash (em dash, "—") anywhere. Use a normal hyphen "-", a comma, or a colon instead.
+
             Respond ONLY with a valid JSON array. No markdown, no explanation, no code blocks.
             Format:
             [{"type":"MCQ","text":"...","options":["A","B","C","D"],"correctAnswer":"A"},
@@ -54,6 +56,7 @@ public class GeminiPromptBuilder {
                 - Each question has exactly 4 options
                 - Exactly one option is correct
                 - correctAnswer must be identical to one of the strings in the options array
+                - Never use the long dash (em dash, "—"); use a hyphen "-" or a comma instead
 
                 Respond ONLY with a valid JSON array. No markdown, no explanation, no code blocks.
                 Format:

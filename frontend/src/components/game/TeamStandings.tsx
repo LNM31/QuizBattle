@@ -1,4 +1,4 @@
-import { Crown } from 'lucide-react'
+import { Crown, Trophy } from 'lucide-react'
 import type { TeamStanding } from '../../types'
 import { getTeam } from '../../lib/teams'
 
@@ -33,9 +33,11 @@ export function TeamStandings({ teams, myTeamId, showMvp = false }: TeamStanding
             ].join(' ')}
           >
             {/* Rank — winner gets the trophy */}
-            <span className="w-7 text-center text-sm font-bold shrink-0">
-              {isWinner ? '🏆' : (
-                <span className="text-slate-400 dark:text-slate-500 tabular-nums">{team.rank}</span>
+            <span className="w-7 flex items-center justify-center shrink-0">
+              {isWinner ? (
+                <Trophy size={18} className="text-amber-400" />
+              ) : (
+                <span className="text-sm text-slate-400 dark:text-slate-500 tabular-nums">{team.rank}</span>
               )}
             </span>
 

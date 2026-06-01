@@ -1,4 +1,4 @@
-import { Flame } from 'lucide-react'
+import { Flame, Medal } from 'lucide-react'
 
 export type PodiumEntry = {
   position: number
@@ -14,31 +14,33 @@ interface PodiumProps {
   myNickname: string
 }
 
-const MEDALS = ['🥇', '🥈', '🥉'] as const
+// Rank medal icons (lucide): gold / silver / bronze.
+const MEDAL_ICON: Record<number, { size: number; color: string }> = {
+  1: { size: 44, color: 'text-amber-400' },
+  2: { size: 36, color: 'text-slate-400' },
+  3: { size: 32, color: 'text-amber-700 dark:text-amber-600' },
+}
 
 // Staggered entrance: bronze rises first, gold last (3rd → 2nd → 1st) for a build-up.
 const RISE_DELAY_MS: Record<number, number> = { 1: 300, 2: 150, 3: 0 }
 
-const POSITION: Record<number, { card: string; order: string; pad: string; medal: string; score: string }> = {
+const POSITION: Record<number, { card: string; order: string; pad: string; score: string }> = {
   1: {
     card: 'border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20',
     order: 'md:order-2',
     pad: 'md:py-10',
-    medal: 'text-5xl',
     score: 'text-2xl md:text-3xl',
   },
   2: {
     card: 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900',
     order: 'md:order-1',
     pad: 'md:py-6',
-    medal: 'text-4xl',
     score: 'text-xl',
   },
   3: {
     card: 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900',
     order: 'md:order-3',
     pad: 'md:py-4',
-    medal: 'text-3xl',
     score: 'text-xl',
   },
 }
@@ -64,8 +66,18 @@ export function Podium({ entries, myNickname }: PodiumProps) {
               isYou ? 'ring-2 ring-indigo-500 ring-offset-2 dark:ring-offset-slate-950' : '',
             ].join(' ')}
           >
-            <span className={s.medal}>
-              {MEDALS[entry.position - 1] ?? `#${entry.position}`}
+            <span className="flex items-center justify-center">
+              {MEDAL_ICON[entry.position] ? (
+                <Medal
+                  size={MEDAL_ICON[entry.position].size}
+                  strokeWidth={2}
+                  className={MEDAL_ICON[entry.position].color}
+                />
+              ) : (
+                <span className="text-2xl font-bold text-slate-400 dark:text-slate-500">
+                  #{entry.position}
+                </span>
+              )}
             </span>
 
             <p

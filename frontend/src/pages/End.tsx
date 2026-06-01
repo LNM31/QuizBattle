@@ -95,7 +95,7 @@ export default function End() {
       : 0
     const avgTime = me.correctCount > 0
       ? `${(me.avgResponseMs / 1000).toFixed(1)}s`
-      : '—'
+      : '-'
 
     const stats: { icon: LucideIcon; label: string; value: string }[] = [
       { icon: Target, label: 'Accuracy', value: `${accuracy}%` },
@@ -152,7 +152,7 @@ export default function End() {
   const myAvgTime =
     myResult && myResult.correctCount > 0
       ? `${(myResult.avgResponseMs / 1000).toFixed(1)}s`
-      : '—'
+      : '-'
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 py-4">
